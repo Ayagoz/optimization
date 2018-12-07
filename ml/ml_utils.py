@@ -4,17 +4,7 @@ from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from models.RegPred.ml.ExpTransformer import ExpTransformer
-
-
-def hinge_loss(y_pred, y_true):
-    if np.min(y_true) == 0:
-        y_copy = 2 * y_true.copy() - 1
-    else:
-        y_copy = np.copy(y_true)
-    x = np.zeros(shape=(2,) + y_true.shape)
-    x[0, :] = 1 - y_copy * y_pred
-    return np.max(x, axis=0)
+from .ExpTransformer import ExpTransformer
 
 
 def hinge_loss_coef(y_pred, y_true):
@@ -30,7 +20,7 @@ def find_pipeline_params(X, y, params, n_jobs=5, random_state=0, scaled=False, s
         pipe = Pipeline([('scale', StandardScaler(with_std=False)), ('kernel', ExpTransformer()),
                          ('ml', LogisticRegression(max_iter=10 ** 5))])
     else:
-        pipe = Pipeline([('kernel', ExpTransformer()), ('ml', LogisticRegression(max_iter=10 ** 5))])
+        pipe = Pipeline([('kernel', ExpTransformer()), ('ml', LogisticRegression(n_jobs=1, max_iter=10 ** 5))])
 
     cv = StratifiedShuffleSplit(n_splits, random_state=random_state)
     gr = GridSearchCV(estimator=pipe, param_grid=params, scoring=scoring, n_jobs=n_jobs, cv=cv)
@@ -105,7 +95,7 @@ def diff_hinge_loss_lr(loss_coef, beta, proba_train, y_train, exp_K_test,
     # sigma - y_true
     p_t = (proba_train - y_train)[None, :]
 
-    # d argmin(MLE + l2(beta))/d beta/da =
+    # d argmin(MLE + l2(beta))/d beta/da
     # dX/da * (sigma - y_true) + X *(dsigma/da)
     # suppose that beta is constant, so dbeta/da = 0
 

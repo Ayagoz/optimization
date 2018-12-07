@@ -8,10 +8,11 @@ from tqdm import tqdm
 
 
 def load_nii(path_to_nii, data_type=None):
-    if '.nii' in data_type:
-        np.squeeze(np.array(nib.load(os.path.join(path_to_nii, data_type)).get_data()))
-    elif data_type is not None:
-        return np.squeeze(np.array(nib.load(os.path.join(path_to_nii, data_type + '.nii')).get_data()))
+    if data_type is not None:
+        if 'nii' in data_type:
+            np.squeeze(np.array(nib.load(os.path.join(path_to_nii, data_type)).get_data()))
+        else:
+            return np.squeeze(np.array(nib.load(os.path.join(path_to_nii, data_type + '.nii')).get_data()))
     else:
         return np.squeeze(np.array(nib.load(path_to_nii).get_data()))
 
@@ -29,7 +30,7 @@ def load_data_from_dirs(global_path, data_type, file_type):
     subj_names = []
     path = os.listdir(global_path)
 
-    for subj in tqdm(path, decs='loading subjects'):
+    for subj in tqdm(path, desc='loading subjects'):
         path_to_subj = os.path.join(os.path.join(global_path, subj), 'nii')
 
         image = load_nii(path_to_subj, data_type)
@@ -38,7 +39,7 @@ def load_data_from_dirs(global_path, data_type, file_type):
                 data.append(image)
             if file_type == 'path':
                 data.append(os.path.join(path_to_subj, data_type + '.nii'))
-        subj_names.append(subj)
+            subj_names.append(subj)
 
     return data, subj_names
 
@@ -80,7 +81,8 @@ def load_target(path, idx, target_type):
     meta = pd.read_csv(path)[['SubjID', target_type]]
     target = []
     for one in idx:
-        target.append(int(meta[meta.SubjId == one][target_type]))
+        if isinstance(one, (str, np.str, np.string_)):
+            target.append(int(meta[meta.SubjID == int(one)][target_type]))
     return np.array(target)
 
 
@@ -98,12 +100,13 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
     :return: data and target
     '''
 
-    if file_type == 'nii':
+    if file_type == 'nii' or file_type == 'path':
         data, names = load_data_from_nii(path, data_type, file_type)
         if data_type is None:
             return data
         if path_to_meta is not None:
             target = load_target(path_to_meta, names, target_type)
+
             if balanced:
                 idx = balanced_fold(target)
                 return data[np.ix_(idx)], target[np.ix_(idx)]
@@ -118,3 +121,6 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
             idx = balanced_fold(target)
             return data[np.ix_(idx)], target[np.ix_(idx)]
         return data, target
+
+
+

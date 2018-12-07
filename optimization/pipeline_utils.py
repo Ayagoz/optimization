@@ -4,7 +4,7 @@ except:
     import os
     import sys
 
-    module_path = '~/workspace/rtk/'
+    module_path = '~/src/rtk/'
     if module_path not in sys.path:
         sys.path.append(module_path)
     PACKAGE_PARENT = '..'
@@ -17,17 +17,21 @@ import nibabel as nib
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-from models.RegPred.ml.ml_utils import expand_dims
-from models.RegPred.utils import load_images, load_nii
-from models.RegPred.preprocessing import change_resolution
-from .derivatives import get_delta, get_derivative_Lv
+from RegOptim.ml.ml_utils import expand_dims
+from RegOptim.utils import load_images, load_nii
+from RegOptim.preprocessing import change_resolution
+from .derivatives import get_derivative_Lv
 
+from pathlib2 import Path
+import os
 
 def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, inverse=False):
     images = []
+    Path(exp_path).mkdir(exist_ok=True)
+
     path_to_template = os.path.join(exp_path, 'templates/')
 
-    os.makedirs(path_to_template, exist_ok=True)
+    Path(path_to_template).mkdir(exist_ok=True)
 
     if isinstance(path_to_data[0], (str, np.string_)):
         images = load_images(path_to_data[np.ix_(train_idx)])
@@ -45,7 +49,7 @@ def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, i
 
     template_nifty = nib.Nifti1Image(template, np.eye(4))
     nib.save(template_nifty, path_to_template)
-    return images
+    return template
 
 
 ###change!!! something wrong
@@ -61,12 +65,13 @@ def update_template(template_path, delta, it, learning_rate=0.1, resolution=1., 
 
     image -= learning_rate * delta
 
+
+    new_image = nib.Nifti1Image(image, np.eye(4))
+    new_path = template_path.split('.nii')[0] + '_' + str(it) + '.nii'
+    nib.save(new_image, new_path)
+
     if isinstance(data_type, np.ndarray):
         return image
-
-    image = nib.Nifti1Image(image, np.eye(4))
-    new_path = template_path.split('.nii')[0] + '_' + str(it) + '.nii'
-    nib.save(image, new_path)
 
     if isinstance(data_type, (str, np.string_, np.str)):
         return new_path

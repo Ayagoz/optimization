@@ -34,10 +34,12 @@ def to_one_resolution(resulting_vector_fields, resolutions, n_steps,
 def change_resolution(images, resolution, sigma=0.01, order=1, multiple=True):
     N = len(images)
     blurred_images = gaussian_filter(images, sigma)
-    ratio = [1 / float(resolution)] * images[0].ndim
+
     if multiple:
+        ratio = [1 / float(resolution)] * images[0].ndim
         images_another_resolution = np.array([zoom(blurred_images[i], ratio, order=order) for i in range(N)])
     else:
+        ratio = [1 / float(resolution)] * images.ndim
         images_another_resolution = zoom(blurred_images, ratio, order=order)
     return images_another_resolution
 

@@ -4,7 +4,7 @@ except:
     import os
     import sys
 
-    module_path = '~/workspace/rtk/'
+    module_path = '~/src/rtk/'
     if module_path not in sys.path:
         sys.path.append(module_path)
     PACKAGE_PARENT = '..'
@@ -18,14 +18,14 @@ import copy
 
 from joblib import Parallel, delayed
 
-joblib_folder = '~/workspace/JOBLIB_TMP_FOLDER/'
+joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 
-from models.RegPred.optimization.derivatives import to_one_resolution, get_derivative_Lv, get_derivative_v, \
+from RegOptim.optimization.derivatives import to_one_resolution, get_derivative_Lv, get_derivative_v, \
     get_derivative_template
-from models.RegPred.optimization.pipeline_utils import count_dJ, count_K_with_template, count_da_db_with_template
-from models.RegPred.optimization.pipeline_utils import count_K_without_template, count_da_db_without_template
-from models.RegPred.utils import load_nii
-from models.RegPred.preprocessing import change_resolution
+from RegOptim.optimization.pipeline_utils import count_dJ, count_K_with_template, count_da_db_with_template
+from RegOptim.optimization.pipeline_utils import count_K_without_template, count_da_db_without_template
+from RegOptim.utils import load_nii
+from RegOptim.preprocessing import change_resolution
 
 
 def pairwise_pipeline_derivatives(reg, inverse):
@@ -48,7 +48,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         # find Lv(t=1,ndim, img_shape)
         Lvf = regularizer(in_one_res[0])[None]
         # get derivatives of Lv
-        Deltas_v = zip(*get_derivative_Lv(reg.As[-1], in_one_res, a, b))
+        Deltas_v = get_derivative_Lv(reg.As[-1], in_one_res, a, b)
         dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
     else:
         Lvf = np.stack([regularizer(in_one_res[i]) for i in range(reg.n_step + 1)], 0)
@@ -61,9 +61,9 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         dv_dJ = get_derivative_template(data, template, reg.n_step, vf_all_in_one_res,
                                         similarity, regularizer, vf0, inverse)
 
-        return [Lvf], [in_one_res], [dv_da], [dv_db], [dLv_da], [dLv_db], [dv_dJ]
+        return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
 
-    return [Lvf], [in_one_res], [dv_da], [dv_db], [dLv_da], [dLv_db]
+    return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
 def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
@@ -88,6 +88,7 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
 
     if data_type == 'path':
         data1 = load_nii(data1)
+    if isinstance(data2, (str, np.str, np.string_)):
         data2 = load_nii(data2)
 
     if change_res:
@@ -116,20 +117,18 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
         return pairwise_pipeline_derivatives(reg, inverse)
 
 
-def derivatives_of_pipeline_with_template(result, train_idx, n_total, n_job):
+def derivatives_of_pipeline_with_template(result, train_idx, n_total, n_job=1):
     n_train = len(train_idx)
 
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
-
     shape = np.array(Lvfs).shape[2:]
     ndim = len(shape)
 
     dJ = np.zeros((n_train, n_train) + shape)
     i, j = np.triu_indices(n_train, 0)
-    dJ[i, j] = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(
-        delayed(count_dJ)(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim)
-        for i, idx1 in tqdm(enumerate(train_idx), decs='dJ_train')
-        for idx2 in train_idx[i:])
+    dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim)
+                for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
+                for idx2 in train_idx[i:]])
 
     K = count_K_with_template(Lvfs, vfs, n_total)
     da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
@@ -144,31 +143,31 @@ def derivatives_of_pipeline(result, n_total):
     return K, da, db
 
 
-def count_dist_matrix_to_template(data, template, a, b, train_idx, epsilon=0.1, n_job=5, ssd_var=1000., n_steps=20,
-                                  n_iters=(50, 20, 10), resolutions=(4, 2, 1), smoothing_sigmas=(2., 1., 0.),
-                                  delta_phi_threshold=0.1, unit_threshold=0.01, learning_rate=0.01, change_res=True,
-                                  init_resolution=4, data_type='path', vf0=True,
+def count_dist_matrix_to_template(data, template, a, b, train_idx, epsilon=0.1, n_job=5, ssd_var=1000.,
+                                  n_steps=30, n_iters=(50, 20, 10), resolutions=(4, 2, 1), smoothing_sigmas=(2., 1., 0.),
+                                  delta_phi_threshold=0.1, unit_threshold=0.01, learning_rate=0.01,
+                                  change_res=True, init_resolution=4, data_type='path', vf0=True,
                                   inverse=False, optim_template=True):
     n = len(data)
 
-    result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(delayed(one_to_one)(data1=copy.deepcopy(data[i]),
-                                                                                   data2=copy.deepcopy(template), a=a,
-                                                                                   b=b,
-                                                                                   epsilon=epsilon,
-                                                                                   ssd_var=ssd_var,
-                                                                                   n_steps=n_steps,
-                                                                                   n_iters=n_iters,
-                                                                                   resolutions=resolutions,
-                                                                                   smoothing_sigmas=smoothing_sigmas,
-                                                                                   delta_phi_threshold=delta_phi_threshold,
-                                                                                   unit_threshold=unit_threshold,
-                                                                                   learning_rate=learning_rate,
-                                                                                   n_jobs=1, vf0=vf0, inverse=inverse,
-                                                                                   optim_template=optim_template,
-                                                                                   data_type=data_type,
-                                                                                   change_res=change_res,
-                                                                                   init_resolution=init_resolution,
-                                                                                   pipe_template=True)
+    result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(delayed(one_to_one)(data1=data[i],
+                                                                                   data2=template,
+                                                                       a=a, b=b,
+                                                                       epsilon=epsilon,
+                                                                       ssd_var=ssd_var,
+                                                                       n_steps=n_steps,
+                                                                       n_iters=n_iters,
+                                                                       resolutions=resolutions,
+                                                                       smoothing_sigmas=smoothing_sigmas,
+                                                                       delta_phi_threshold=delta_phi_threshold,
+                                                                       unit_threshold=unit_threshold,
+                                                                       learning_rate=learning_rate,
+                                                                       n_jobs=1, vf0=vf0, inverse=inverse,
+                                                                       optim_template=optim_template,
+                                                                       data_type=data_type,
+                                                                       change_res=change_res,
+                                                                       init_resolution=init_resolution,
+                                                                       pipe_template=True)
                                                                for i in tqdm(range(n), desc="registration"))
 
     if optim_template:

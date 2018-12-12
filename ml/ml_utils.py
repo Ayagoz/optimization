@@ -78,7 +78,7 @@ def diff_template(K_train, dJ_train, K_test, dJ_test, H, s1s, beta, loss_coef, p
 
 def diff_hinge_loss_lr(loss_coef, beta, proba_train, y_train, exp_K_test,
                        exp_K_train, da_train, db_train, da_test, db_test, alpha,
-                       dJ_train, dJ_test, scaled=False, with_template=False, ndim=None):
+                       dJ_train=None, dJ_test=None, scaled=False, with_template=False, ndim=None):
     '''
     for MLE + ||beta||^2 maximization
     (try another for Entropy?)
@@ -110,7 +110,11 @@ def diff_hinge_loss_lr(loss_coef, beta, proba_train, y_train, exp_K_test,
     dxda = -loss_coef * (exp_K_test.dot(H.dot(dd_da.T)) + dexp_da_test.dot(beta.T))
     dxdb = -loss_coef * (exp_K_test.dot(H.dot(dd_db.T)) + dexp_db_test.dot(beta.T))
 
+
     if with_template:
+        if dJ_train is None and dJ_test is None:
+            raise TypeError('No template derivatives in mode with_template!')
+        
         dJ = diff_template(exp_K_train, dJ_train, exp_K_test, dJ_test, H, s1s, beta, loss_coef, p_t, alpha, ndim)
         return np.sum(dxda), np.sum(dxdb), np.array(dJ)
 

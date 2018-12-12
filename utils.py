@@ -113,7 +113,7 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
             return data, target
 
     if file_type == 'pkl':
-        with open(os.path.join(path, data_type + '.pkl'), 'rb') as f:
+        with open(os.path.join(path, data_type + '_data.pkl'), 'rb') as f:
             data = pickle.load(f)
         with open(os.path.join(path, data_type + '_target.pkl'), 'rb') as f:
             target = pickle.load(f)

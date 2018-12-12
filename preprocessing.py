@@ -5,7 +5,51 @@ from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import zoom
 from joblib import Parallel, delayed
 
+import cv2
+
 from .utils import load_nii, save_nii
+
+def get_contour(image, channel=3, width=3, ndim=3, lower=15, upper=250):
+    '''
+    works just for one subject on image
+    :param image: input image
+    :param channel: boundary color
+    :param width: of boundary
+    :param type_of_channels:
+    :param ndim: ndim of image
+    :param lower: color of object greater than lower
+    :param upper: color of object less that upper
+    :return: mask of contour
+    '''
+
+
+    if len(image.shape) > ndim:
+        lower_ = np.array([lower] * (ndim + 1))
+        upper_ = np.array([upper] * (ndim + 1))
+        shapeMask = cv2.inRange(image, lower_, upper_)
+    else:
+        shapeMask = image.copy()
+
+    shapeMask = shapeMask.astype(np.uint8)
+
+    cnts = cv2.findContours(shapeMask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[1]
+
+    if channel == 1:
+        bound_color = (upper, 0, 0)
+    elif channel == 2:
+        bound_color = (0, upper, 0)
+    else:
+        bound_color = (0, 0, upper)
+
+
+    color = cv2.cvtColor(shapeMask, cv2.COLOR_GRAY2BGR)
+    cv2.drawContours(color, cnts, -1, bound_color, width)
+
+    return (color[..., channel - 1] == upper).astype(int)
+
+
+
+
 
 def to_one_resolution(resulting_vector_fields, resolutions, n_steps,
                       zoom_grid, vf0, inverse):

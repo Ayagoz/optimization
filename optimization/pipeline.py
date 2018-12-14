@@ -88,11 +88,14 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
 
     if data_type == 'path':
         data1 = load_nii(data1)
+
     if isinstance(data2, (str, np.str, np.string_)):
         data2 = load_nii(data2)
 
     if change_res:
         data1 = np.squeeze(change_resolution(data1, init_resolution, multiple=False))
+
+    if data2.shape != data1.shape:
         data2 = np.squeeze(change_resolution(data2, init_resolution, multiple=False))
 
     # inverse means that we would like to find path from X to template

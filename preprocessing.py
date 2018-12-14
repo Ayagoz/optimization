@@ -9,44 +9,99 @@ import cv2
 
 from .utils import load_nii, save_nii
 
-def get_contour(image, channel=3, width=3, ndim=3, lower=15, upper=250):
-    '''
-    works just for one subject on image
-    :param image: input image
-    :param channel: boundary color
-    :param width: of boundary
-    :param type_of_channels:
-    :param ndim: ndim of image
-    :param lower: color of object greater than lower
-    :param upper: color of object less that upper
-    :return: mask of contour
-    '''
+def padding(image, ndim=2, pad_shape=3, mode='constant', c_val=0):
 
-
-    if len(image.shape) > ndim:
-        lower_ = np.array([lower] * (ndim + 1))
-        upper_ = np.array([upper] * (ndim + 1))
-        shapeMask = cv2.inRange(image, lower_, upper_)
+    if image.ndim > ndim:
+        pad = [(pad_shape, pad_shape)] * ndim + [(0, 0)]
     else:
-        shapeMask = image.copy()
+        pad = [(pad_shape, pad_shape)] * ndim
 
-    shapeMask = shapeMask.astype(np.uint8)
+    if isinstance(image, (str, np.str, np.string_)):
+        data = load_nii(image)
+        if mode == 'constant':
+            padded_data = np.pad(data.copy(), tuple(pad), mode=mode, constant_values=c_val)
+        else:
+            padded_data = np.pad(data.copy(), tuple(pad), mode=mode)
 
-    cnts = cv2.findContours(shapeMask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[1]
+        return  padded_data
 
-    if channel == 1:
-        bound_color = (upper, 0, 0)
-    elif channel == 2:
-        bound_color = (0, upper, 0)
+    if isinstance(image, np.ndarray):
+        if mode =='constant':
+            padded_data = np.pad(image.copy(), tuple(pad), mode=mode, constant_values=c_val)
+        else:
+            padded_data = np.pad(image.copy(), tuple(pad), mode=mode)
+
+        return  padded_data
+
+def get_contour3D(image, axis=0, contour_color=150, width=3, mask=True):
+    '''
+
+    :param image: last axis of image should be channel if it is
+                  and it should be N * W * H
+    :param axis: along which axis to find contours, should be one of N, W, H
+    :return: 3D binary contours
+    '''
+
+    # if len(image.shape) > 3:
+    #     raise TypeError('image should be in binary!')
+
+    data = image.copy()
+
+    if axis != 0:
+        data = np.swapaxes(data, 0, axis)
+        shape = data.shape
     else:
-        bound_color = (0, 0, upper)
+        shape = data.shape
+    if mask:
+        if image.ndim > 3:
+            mask_img = np.zeros(shape[:-1])
+        else:
+            mask_img = np.zeros(shape)
+    else:
+        mask_img = np.zeros(shape)
 
 
-    color = cv2.cvtColor(shapeMask, cv2.COLOR_GRAY2BGR)
-    cv2.drawContours(color, cnts, -1, bound_color, width)
+    for ax in range(mask_img.shape[0]):
+         mask_img[ax, ...] = get_contour2D(data[ax, ...], contour_color, width, mask)
 
-    return (color[..., channel - 1] == upper).astype(int)
+    if axis != 0:
+        return np.swapaxes(mask_img, 0, axis)
 
+    return mask_img
+
+
+def find_threshold_gray_scale(img):
+    bins, x = np.histogram(img.reshape(-1))
+    idx = np.where(bins == 0)[0]
+    idx = idx[len(idx) / 2]
+    return x[idx]
+
+
+def get_contour2D(image, contour_color=150, width=3, mask=True):
+    if image.ndim == 3:
+        imgray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        imgray = image.copy()
+
+    t = find_threshold_gray_scale(imgray)
+    ret, thresh = cv2.threshold(imgray, t, 255, 0)
+
+    im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    if mask:
+        if image.ndim == 3:
+            result = cv2.drawContours(image.copy(), contours, -1, (0, contour_color, 0), width)
+            return (result[..., 1] == contour_color).astype(int)
+        else:
+            result = cv2.drawContours(thresh.copy(), contours, -1, contour_color, width)
+            return (result == contour_color).astype(int)
+    else:
+        if image.ndim == 3:
+            result = cv2.drawContours(image.copy(), contours, -1, (0, contour_color, 0), width)
+            return result
+        else:
+            result = cv2.drawContours(thresh.copy(), contours, -1, contour_color, width)
+            return result
 
 
 

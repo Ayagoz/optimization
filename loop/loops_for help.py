@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import roc_auc_score, hinge_loss
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
 
 from RegOptim.ml import diff_hinge_loss_lr, hinge_loss_coef
 
@@ -62,3 +63,28 @@ def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=Fa
         return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs)
 
     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs)
+
+def test_score(K, y, idx_train, idx_test, params, scaled=False):
+    exp_K = np.exp(-params['gamma'] * K)
+
+    K_train, y_train = exp_K[np.ix_(idx_train, idx_train)], y[np.ix_(idx_train)]
+    K_test, y_test = exp_K[np.ix_(idx_test, idx_train)], y[np.ix_(idx_test)]
+
+    if scaled:
+        sc = StandardScaler(with_std=False)
+        K_train = sc.fit_transform(K_train)
+        K_test = sc.transform(K_test)
+
+    # find best params on train
+
+    # find best score on test
+    clf = LogisticRegression(C=params['C'], max_iter=10 ** 5)
+    clf.fit(K_train, y_train)
+
+    lr_best_score = roc_auc_score(y_test, clf.predict_proba(K_test).T[1])
+
+    print "Test scores: ", lr_best_score
+
+    return lr_best_score
+
+

@@ -21,9 +21,11 @@ from RegOptim.ml.ml_utils import expand_dims
 from RegOptim.utils import load_images, load_nii
 from RegOptim.preprocessing import change_resolution
 from .derivatives import get_derivative_Lv
+from RegOptim.image_utils import get_contour2D, get_contour3D, pad_images, check_for_padding
 
 from pathlib2 import Path
 import os
+
 
 def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, inverse=False):
     images = []
@@ -52,12 +54,11 @@ def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, i
     return template
 
 
-###change!!! something wrong
-def update_template(template_path, delta, it, learning_rate=0.1, resolution=1., inverse=False, data_type=np.ndarray):
-    if isinstance(data_type, (str, np.string_, np.str)):
+def update_template(template_path, delta, it, learning_rate=0.1):
+    if isinstance(template_path, (str, np.string_, np.str)):
         image = load_nii(template_path)
-    if isinstance(data_type, np.ndarray):
-        image = template_path
+    else:
+        image = template_path.copy()
 
     if image.shape != delta.shape:
         print 'Error not correct shape or resolution'
@@ -65,16 +66,48 @@ def update_template(template_path, delta, it, learning_rate=0.1, resolution=1., 
 
     image -= learning_rate * delta
 
-
     new_image = nib.Nifti1Image(image, np.eye(4))
     new_path = template_path.split('.nii')[0] + '_' + str(it) + '.nii'
     nib.save(new_image, new_path)
 
-    if isinstance(data_type, np.ndarray):
+    if isinstance(template_path, np.ndarray):
         return image
 
-    if isinstance(data_type, (str, np.string_, np.str)):
+    if isinstance(template_path, (str, np.string_, np.str)):
         return new_path
+
+
+def pad_template_data_after_loop(template_delta, data, pad_size=2, ndim=3):
+    if isinstance(template_delta, (str, np.str, np.string_)):
+        image = load_nii(template_delta)
+    else:
+        image = template_delta.copy()
+
+    if check_for_padding(image):
+        padded_template = pad_images([template_delta], pad_size, ndim)
+        padded_data = pad_images(data, pad_size, ndim)
+        return padded_template, padded_data
+    else:
+        return template_delta, data
+
+
+def binarize(delta):
+    bin_delta = delta.copy()
+    bin_delta[delta != 0] = 1.
+
+    return bin_delta
+
+
+def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3):
+    bin_delta = binarize(delta)
+    if ndim == 3:
+        contour_delta = get_contour3D(bin_delta, axis, contour_color, width, mask=True)
+    elif ndim == 2:
+        contour_delta = get_contour2D(bin_delta, contour_color, width, mask=True)
+    else:
+        raise TypeError('Do not support images of ndim not equal 2 or 3')
+
+    return delta * contour_delta
 
 
 def count_K_with_template(Lvf, vf, n):

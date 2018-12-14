@@ -7,6 +7,8 @@ import os
 from tqdm import tqdm
 
 
+
+
 def load_nii(path_to_nii, data_type=None):
     if data_type is not None:
         if 'nii' in data_type:
@@ -102,7 +104,7 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
 
     if file_type == 'nii' or file_type == 'path':
         data, names = load_data_from_nii(path, data_type, file_type)
-        if data_type is None:
+        if target_type is None:
             return data
         if path_to_meta is not None:
             target = load_target(path_to_meta, names, target_type)

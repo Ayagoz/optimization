@@ -64,6 +64,7 @@ def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=Fa
 
     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs)
 
+
 def test_score(K, y, idx_train, idx_test, params, scaled=False):
     exp_K = np.exp(-params['gamma'] * K)
 
@@ -86,5 +87,3 @@ def test_score(K, y, idx_train, idx_test, params, scaled=False):
     print "Test scores: ", lr_best_score
 
     return lr_best_score
-
-

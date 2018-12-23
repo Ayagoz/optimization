@@ -12,7 +12,7 @@ class ExpTransformer(BaseEstimator, ClassifierMixin):
         pass
 
     def transform(self, X, y=None):
-        return np.exp(-self.gamma * X)
+        return 1 - np.exp(-self.gamma * X)
 
     def fit_transform(self, X, y=None):
         return self.transform(X, y)

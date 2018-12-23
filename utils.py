@@ -6,7 +6,7 @@ import os
 
 from tqdm import tqdm
 
-
+from sklearn.model_selection import StratifiedShuffleSplit
 
 
 def load_nii(path_to_nii, data_type=None):
@@ -22,7 +22,7 @@ def load_nii(path_to_nii, data_type=None):
 def save_nii(image, path, name=None):
     image_nii = nib.Nifti1Image(image, np.eye(4))
     if name is None:
-        nib.save(image, path)
+        nib.save(image_nii, path)
     if name is not None:
         nib.save(image_nii, os.path.join(path, name + '.nii'))
 
@@ -83,7 +83,7 @@ def load_target(path, idx, target_type):
     meta = pd.read_csv(path)[['SubjID', target_type]]
     target = []
     for one in idx:
-        if isinstance(one, (str, np.str, np.string_)):
+        if isinstance(one, (str, np.str, np.string_, np.unicode_)):
             target.append(int(meta[meta.SubjID == int(one)][target_type]))
     return np.array(target)
 
@@ -108,7 +108,6 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
             return data
         if path_to_meta is not None:
             target = load_target(path_to_meta, names, target_type)
-
             if balanced:
                 idx = balanced_fold(target)
                 return data[np.ix_(idx)], target[np.ix_(idx)]
@@ -125,4 +124,8 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
         return data, target
 
 
+def get_subset(X, y, size=0.5, random_state=0):
+    idx_train, idx_test = list(StratifiedShuffleSplit(n_splits=1, random_state=random_state,
+                                                      test_size=1-size).split(range(len(X)), y))[0]
+    return X[np.ix_(idx_train)], y[np.ix_(idx_train)]
 

@@ -1,15 +1,19 @@
 import numpy as np
-def stepwise_lr(lr_previous, k, it, decay=0.1, border_for_lr= 5*1e-3):
-    if lr_previous < border_for_lr:
-        return lr_previous
-
-    if it%k == 0:
-        return lr_previous * decay
 
 
+def stepwise_lr(prev_lr, it, step, decay=0.1, border_for_lr= 5*1e-3):
+    if prev_lr * decay < border_for_lr:
+        return prev_lr
 
-def exponential_decay(initial_lr, it, k=0.1):
-    return initial_lr * np.exp(-k*it)
+    if it % step == 0:
+        return prev_lr * decay
+    else:
+        return prev_lr
+
+
+def exponential_decay(init_lr, it, k=0.1):
+    return init_lr * np.exp(-k*it)
+
 
 def cycle(step_size, it,  max_lr=0.9, min_lr=1e-2*5):
     lr_cycle = np.floor(1 + it/float(2*step_size))
@@ -17,7 +21,7 @@ def cycle(step_size, it,  max_lr=0.9, min_lr=1e-2*5):
     return min_lr + (max_lr- min_lr) * np.max([0, 1-x])
 
 
-def cycle1(step_size, init_lr, it, scale, num_iter=20):
+def cycle1(init_lr, step_size, it, scale=0.1, num_iter=20):
     if it > 2 * step_size:
         x = (it - 2 * step_size)/float(num_iter - 2 * step_size)
         new_lr =init_lr * (1. + (x * (1. - 100.) / 100.)) * scale

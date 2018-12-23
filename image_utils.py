@@ -18,10 +18,11 @@ def check_for_padding(image):
 
 
 def pad_images(data, pad_size=2, ndim=3):
-    if isinstance(data, np.ndarray):
-        images = data.copy()
-    if isinstance(data[0], (str, np.str, np.string_)):
+
+    if isinstance(data[0], (str, np.str, np.string_, np.unicode_)):
         images = np.array([load_nii(subj, None) for subj in data])
+    else:
+        images = data.copy()
 
     padded_image = np.array([padding(img, ndim, pad_size, mode='edge') for img in images])
 
@@ -29,17 +30,17 @@ def pad_images(data, pad_size=2, ndim=3):
 
     if isinstance(data, np.ndarray):
         return padded_image
-    if isinstance(data[0], (str, np.str, np.string_)):
+    if isinstance(data[0], (str, np.str, np.string_, np.unicode_)):
         return data
 
 
-def padding(image, ndim=2, pad_shape=3, mode='constant', c_val=0):
+def padding(image, ndim=2, pad_size=2, mode='constant', c_val=0):
     if image.ndim > ndim:
-        pad = [(pad_shape, pad_shape)] * ndim + [(0, 0)]
+        pad = [(pad_size, pad_size)] * ndim + [(0, 0)]
     else:
-        pad = [(pad_shape, pad_shape)] * ndim
+        pad = [(pad_size, pad_size)] * ndim
 
-    if isinstance(image, (str, np.str, np.string_)):
+    if isinstance(image, (str, np.str, np.string_, np.unicode_)):
         data = load_nii(image)
         if mode == 'constant':
             padded_data = np.pad(data.copy(), tuple(pad), mode=mode, constant_values=c_val)
@@ -108,7 +109,7 @@ def get_contour2D(image, contour_color=150, width=3, mask=True):
 
     t = find_threshold_gray_scale(imgray)
     ret, thresh = cv2.threshold(imgray, t, 255, 0)
-
+    thresh = thresh.astype(np.uint8)
     im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     if mask:

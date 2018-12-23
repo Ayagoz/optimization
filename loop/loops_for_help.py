@@ -5,12 +5,17 @@ from sklearn.metrics import roc_auc_score, hinge_loss
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
+
 from RegOptim.ml import diff_hinge_loss_lr, hinge_loss_coef
 
 
-def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=False,
+def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=False, kernel=False,
                 with_template=False, n_splits=10, ndim=3, random_state=0):
-    exp_K_train = np.exp(-params['gamma'] * K_train)
+    if kernel:
+        exp_K_train = np.exp(-params['kernel__gamma'] * K_train)
+    else:
+        exp_K_train = K_train.copy()
+
     roc_aucs = []
     grads_a, grads_b = [], []
     grads_J = []
@@ -24,7 +29,7 @@ def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=Fa
         y_train_loc, y_test_loc = y_train[idx_train], y_train[idx_test]
 
         lr = LogisticRegression(n_jobs=1, max_iter=10 ** 5)
-        lr.set_params(**{'C': params['C']})
+        lr.set_params(**{'C': params['ml__C']})
 
         lr.fit(exp_K_train_loc, y_train_loc)
 
@@ -33,26 +38,74 @@ def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=Fa
         y_pred = lr.predict(exp_K_test_loc)
         hinge_losses.append(np.mean(hinge_loss(y_pred, y_test_loc)))
 
-        loss_coef = hinge_loss_coef(y_pred, y_test_loc)
+
+
         if with_template:
-            grad_a, grad_b, grad_J = diff_hinge_loss_lr(loss_coef, lr.coef_, lr.predict_proba(exp_K_train_loc).T[1],
-                                                        y_train_loc, exp_K_test_loc, exp_K_train_loc,
-                                                        da_train[np.ix_(idx_train, idx_train)],
-                                                        db_train[np.ix_(idx_train, idx_train)],
-                                                        da_train[np.ix_(idx_test, idx_train)],
-                                                        db_train[np.ix_(idx_test, idx_train)],
-                                                        params['gamma'], dJ[np.ix_(idx_train, idx_train)],
-                                                        dJ[np.ix_(idx_test, idx_train)], scaled, with_template, ndim)
+            if kernel:
+                grad_a, grad_b, grad_J = diff_hinge_loss_lr(beta=lr.coef_,
+                                                            proba_test=lr.predict_proba(exp_K_test_loc).T[1],
+                                                            proba_train=lr.predict_proba(exp_K_train_loc).T[1],
+                                                            y_train=y_train_loc, y_test=y_test_loc,
+                                                            exp_K_test=exp_K_test_loc,
+                                                            exp_K_train=exp_K_train_loc,
+                                                            da_train=da_train[np.ix_(idx_train, idx_train)],
+                                                            db_train=db_train[np.ix_(idx_train, idx_train)],
+                                                            da_test=da_train[np.ix_(idx_test, idx_train)],
+                                                            db_test=db_train[np.ix_(idx_test, idx_train)],
+                                                            alpha=params['kernel__gamma'],
+                                                            dJ_train=dJ[np.ix_(idx_train, idx_train)],
+                                                            dJ_test=dJ[np.ix_(idx_test, idx_train)],
+                                                            scaled=scaled, kernel=kernel,
+                                                            with_template=with_template, ndim=ndim)
+            else:
+                grad_a, grad_b, grad_J = diff_hinge_loss_lr(beta=lr.coef_,
+                                                            proba_test=lr.predict_proba(exp_K_test_loc).T[1],
+                                                            proba_train=lr.predict_proba(exp_K_train_loc).T[1],
+                                                            y_train=y_train_loc, y_test=y_test_loc,
+                                                            exp_K_test=exp_K_test_loc,
+                                                            exp_K_train=exp_K_train_loc,
+                                                            da_train=da_train[np.ix_(idx_train, idx_train)],
+                                                            db_train=db_train[np.ix_(idx_train, idx_train)],
+                                                            da_test=da_train[np.ix_(idx_test, idx_train)],
+                                                            db_test=db_train[np.ix_(idx_test, idx_train)],
+                                                            dJ_train=dJ[np.ix_(idx_train, idx_train)],
+                                                            dJ_test=dJ[np.ix_(idx_test, idx_train)],
+                                                            scaled=scaled, kernel=kernel,
+                                                            with_template=with_template, ndim=ndim)
+
             grads_J.append(grad_J)
         else:
-            grad_a, grad_b = diff_hinge_loss_lr(loss_coef, lr.coef_, lr.predict_proba(exp_K_train_loc).T[1],
-                                                y_train_loc, exp_K_test_loc.exp_K_train_loc,
-                                                da_train[np.ix_(idx_train, idx_train)],
-                                                db_train[np.ix_(idx_train, idx_train)],
-                                                da_train[np.ix_(idx_test, idx_train)],
-                                                db_train[np.ix_(idx_test, idx_train)],
-                                                params['gamma'], None, None, scaled, with_template, ndim
-                                                )
+            if kernel:
+                grad_a, grad_b = diff_hinge_loss_lr(beta=lr.coef_,
+                                                proba_train=lr.predict_proba(exp_K_train_loc).T[1],
+                                                proba_test=lr.predict_proba(exp_K_test_loc).T[1],
+                                                y_train=y_train_loc, y_test=y_test_loc,
+                                                exp_K_test=exp_K_test_loc,
+                                                exp_K_train=exp_K_train_loc,
+                                                da_train=da_train[np.ix_(idx_train, idx_train)],
+                                                db_train=db_train[np.ix_(idx_train, idx_train)],
+                                                da_test=da_train[np.ix_(idx_test, idx_train)],
+                                                db_test=db_train[np.ix_(idx_test, idx_train)],
+                                                alpha=params['kernel__gamma'],
+                                                dJ_train=None, dJ_test=None,
+                                                scaled=scaled, kernel=kernel,
+                                                with_template=with_template, ndim=ndim)
+            else:
+                grad_a, grad_b = diff_hinge_loss_lr(beta=lr.coef_,
+                                                    proba_train=lr.predict_proba(exp_K_train_loc).T[1],
+                                                    proba_test=lr.predict_proba(exp_K_test_loc).T[1],
+                                                    y_train=y_train_loc, y_test=y_test_loc,
+                                                    exp_K_test=exp_K_test_loc,
+                                                    exp_K_train=exp_K_train_loc,
+                                                    da_train=da_train[np.ix_(idx_train, idx_train)],
+                                                    db_train=db_train[np.ix_(idx_train, idx_train)],
+                                                    da_test=da_train[np.ix_(idx_test, idx_train)],
+                                                    db_test=db_train[np.ix_(idx_test, idx_train)],
+                                                    dJ_train=None, dJ_test=None,
+                                                    scaled=scaled, kernel=kernel,
+                                                    with_template=with_template, ndim=ndim)
+
+
         grads_a.append(grad_a)
         grads_b.append(grad_b)
 
@@ -60,13 +113,16 @@ def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=Fa
     print 'ROC AUC MEAN: ', np.mean(roc_aucs)
 
     if with_template:
-        return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs)
+        return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs), np.mean(hinge_losses)
 
-    return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs)
+    return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs), np.mean(hinge_losses)
 
 
-def test_score(K, y, idx_train, idx_test, params, scaled=False):
-    exp_K = np.exp(-params['gamma'] * K)
+def test_score_prediction(K, y, idx_train, idx_test, params, scaled=False, kernel=False):
+    if kernel:
+        exp_K = 1 - np.exp(-params['kernel__gamma'] * K)
+    else:
+        exp_K = K.copy()
 
     K_train, y_train = exp_K[np.ix_(idx_train, idx_train)], y[np.ix_(idx_train)]
     K_test, y_test = exp_K[np.ix_(idx_test, idx_train)], y[np.ix_(idx_test)]
@@ -79,11 +135,11 @@ def test_score(K, y, idx_train, idx_test, params, scaled=False):
     # find best params on train
 
     # find best score on test
-    clf = LogisticRegression(C=params['C'], max_iter=10 ** 5)
+    clf = LogisticRegression(C=params['ml__C'], max_iter=10 ** 5)
     clf.fit(K_train, y_train)
 
     lr_best_score = roc_auc_score(y_test, clf.predict_proba(K_test).T[1])
 
     print "Test scores: ", lr_best_score
 
-    return lr_best_score
+    return lr_best_score, hinge_loss(y_test, clf.predict_proba(K_test).T[1])

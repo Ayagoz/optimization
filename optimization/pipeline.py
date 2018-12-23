@@ -1,24 +1,21 @@
-try:
-    import rtk
-except:
-    import os
-    import sys
+import os
+import sys
 
-    module_path = '~/src/rtk/'
-    if module_path not in sys.path:
-        sys.path.append(module_path)
-    PACKAGE_PARENT = '..'
-    SCRIPT_DIR = os.path.dirname(module_path)
-    sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
-    import rtk
+module_path = '~/src/rtk/'
+if module_path not in sys.path:
+    sys.path.append(module_path)
+PACKAGE_PARENT = '..'
+SCRIPT_DIR = os.path.dirname(module_path)
+sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
+import rtk
 
 import numpy as np
-from tqdm import tqdm
 import copy
-
+import gc
+from tqdm import tqdm
+from memory_profiler import profile
 from joblib import Parallel, delayed
 
-joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 
 from RegOptim.optimization.derivatives import to_one_resolution, get_derivative_Lv, get_derivative_v, \
     get_derivative_template
@@ -26,21 +23,30 @@ from RegOptim.optimization.pipeline_utils import count_dJ, count_K_with_template
 from RegOptim.optimization.pipeline_utils import count_K_without_template, count_da_db_without_template
 from RegOptim.utils import load_nii
 from RegOptim.preprocessing import change_resolution
+from RegOptim.image_utils import padding
 
+joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 
+# @profile
 def pairwise_pipeline_derivatives(reg, inverse):
     in_one_res = to_one_resolution(reg.resulting_vector_fields, reg.resolutions, reg.n_step,
                                    reg.zoom_grid, False, inverse)
-    return [np.sum(reg.resulting_metric) / len(reg.resolutions)], [in_one_res]
+
+    return np.sum(reg.resulting_metric) / len(reg.resolutions), in_one_res
 
 
+# @profile
 def template_pipeline_derivatives(reg, similarity, regularizer, data, template, a, b,
-                                  epsilon, shape, vf0, inverse, optim_template):
-    in_one_res = to_one_resolution(reg.resulting_vector_fields, reg.resolutions,
-                                   reg.n_step, reg.zoom_grid, vf0, inverse)
+                                  epsilon, shape, vf0, inverse, optim_template, path,
+                                  n_jobs, window):
+    in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
+                                   resolutions=reg.resolutions,
+                                   n_steps=reg.n_step, zoom_grid=reg.zoom_grid, vf0=vf0, inverse=inverse)
 
-    vf_all_in_one_res = to_one_resolution(reg.resulting_vector_fields, reg.resolutions,
-                                          reg.n_step, reg.zoom_grid, False, inverse)
+    vf_all_in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
+                                          resolutions=reg.resolutions,
+                                          n_steps=reg.n_step, zoom_grid=reg.zoom_grid,
+                                          vf0=False, inverse=inverse)
 
     regularizer.set_operator(shape)
 
@@ -48,29 +54,39 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         # find Lv(t=1,ndim, img_shape)
         Lvf = regularizer(in_one_res[0])[None]
         # get derivatives of Lv
-        Deltas_v = get_derivative_Lv(reg.As[-1], in_one_res, a, b)
+        Deltas_v = get_derivative_Lv(A=reg.As[-1], v=in_one_res, a=a, b=b)
         dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
+        del Deltas_v
     else:
         Lvf = np.stack([regularizer(in_one_res[i]) for i in range(reg.n_step + 1)], 0)
-        Deltas_v = np.array([get_derivative_Lv(reg.As[-1], in_one_res[i], a, b) for i in range(reg.n_step + 1)])
+        Deltas_v = np.array([get_derivative_Lv(A=reg.As[-1], v=vf_all_in_one_res[i], a=a, b=b)
+                                                    for i in range(reg.n_step + 1)])
         dLv_da, dLv_db = Deltas_v[:, 0], Deltas_v[:, 1]
+        del Deltas_v
     # after that will be change reg so, save everything what you need
-    dv_da, dv_db = get_derivative_v(a, b, copy.deepcopy(reg), in_one_res, epsilon, vf0, inverse, data, template)
+    dv_da, dv_db = get_derivative_v(a=a, b=b, reg=copy.deepcopy(reg), vf=in_one_res,
+                                    epsilon=epsilon, vf0=vf0, inverse=inverse, data=data,
+                                    template=template)
 
     if optim_template:
-        dv_dJ = get_derivative_template(data, template, reg.n_step, vf_all_in_one_res,
-                                        similarity, regularizer, vf0, inverse)
-
+        dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
+                                        vf_all_in_one_resolution=vf_all_in_one_res,
+                                        similarity=similarity, regularizer=regularizer,
+                                        vf0=vf0, inverse=inverse, path=path, n_jobs=n_jobs, window=window)
+        gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
-
+    
+    gc.collect()
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
+# @profile
 def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
                n_iters, resolutions, smoothing_sigmas,
                delta_phi_threshold, unit_threshold, learning_rate, n_jobs,
-               vf0, inverse, optim_template, data_type='path',
-               change_res=True, init_resolution=4., pipe_template=True):
+               vf0, inverse, optim_template, data_type='path', path=None,
+               change_res=True, init_resolution=4., pipe_template=True,
+               add_padding=False, pad_size=2, window=3):
     # registration
     similarity = rtk.SSD(variance=ssd_var)
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
@@ -84,19 +100,27 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
         smoothing_sigmas=smoothing_sigmas,
         delta_phi_threshold=delta_phi_threshold,
         unit_threshold=unit_threshold,
-        learning_rate=learning_rate, n_jobs=n_jobs)
+        learning_rate=learning_rate, n_jobs=1)
 
     if data_type == 'path':
         data1 = load_nii(data1)
+    else:
+        if path is None:
+            raise  TypeError('Variable `path` should be initialized.')
 
-    if isinstance(data2, (str, np.str, np.string_)):
+    if isinstance(data2, (str, np.str, np.string_, np.unicode_)):
         data2 = load_nii(data2)
 
     if change_res:
         data1 = np.squeeze(change_resolution(data1, init_resolution, multiple=False))
 
-    if data2.shape != data1.shape:
-        data2 = np.squeeze(change_resolution(data2, init_resolution, multiple=False))
+    if add_padding:
+        #should be add by all iterations! (if two times!! fix it by add pad size!)
+        data1 = padding(data1, ndim=data1.ndim, pad_size=pad_size, mode='edge')
+
+    # template supposed to be right shape
+    # if data2.shape != data1.shape:
+    #     data2 = np.squeeze(change_resolution(data2, init_resolution, multiple=False))
 
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
@@ -113,79 +137,113 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
     # if vf0=True, get (1, ndim, img_shape), else get (t, ndim, img_shape)
 
     if pipe_template:
-        return template_pipeline_derivatives(reg, similarity, regularizer, data1, data2, a, b,
-                                             epsilon, data1.shape, vf0, inverse, optim_template)
+        gc.collect()
+        return template_pipeline_derivatives(reg=reg, similarity=similarity, regularizer=regularizer,
+                                             data=data1, template=data2, a=a, b=b,
+                                             epsilon=epsilon, shape=data1.shape, vf0=vf0,
+                                             inverse=inverse, optim_template=optim_template,
+                                             n_jobs=n_jobs, path=path, window=window)
 
     else:
+        gc.collect()
         return pairwise_pipeline_derivatives(reg, inverse)
 
 
-def derivatives_of_pipeline_with_template(result, train_idx, n_total, n_job=1):
+def derivatives_of_pipeline_with_template(result, train_idx, n_total):
     n_train = len(train_idx)
-
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
     shape = np.array(Lvfs).shape[2:]
     ndim = len(shape)
 
     dJ = np.zeros((n_train, n_train) + shape)
     i, j = np.triu_indices(n_train, 0)
-    dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim)
-                for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
-                for idx2 in train_idx[i:]])
+    
+    if isinstance(dv_dJ[0], (str, np.str, np.string_, np.unicode, np.unicode_)):
+        mode='path'
+    else:
+        mode='array'
+        
+    print count_dJ(Lvfs[0], Lvfs[0], dv_dJ[0], dv_dJ[0], ndim, mode=mode).shape
+    dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim, mode=mode)
+                         for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
+                         for idx2 in train_idx[i:]])
 
     K = count_K_with_template(Lvfs, vfs, n_total)
     da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-    return K, da, db, dJ
+    gc.collect()
+    return K, da, db, dJ + dJ.T - dJ.diagonal()
 
 
+# @profile
 def derivatives_of_pipeline(result, n_total):
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db = map(np.concatenate, zip(*result))
     K = count_K_with_template(Lvfs, vfs, n_total)
     da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-
+    gc.collect()
     return K, da, db
 
 
+# @profile
 def count_dist_matrix_to_template(data, template, a, b, train_idx, epsilon=0.1, n_job=5, ssd_var=1000.,
-                                  n_steps=30, n_iters=(50, 20, 10), resolutions=(4, 2, 1), smoothing_sigmas=(2., 1., 0.),
-                                  delta_phi_threshold=0.1, unit_threshold=0.01, learning_rate=0.01,
-                                  change_res=True, init_resolution=4, data_type='path', vf0=True,
-                                  inverse=False, optim_template=True):
+                                  n_steps=30, n_iters=(50, 20, 10), resolutions=(4, 2, 1),
+                                  smoothing_sigmas=(2., 1., 0.), delta_phi_threshold=0.1,
+                                  unit_threshold=0.01, learning_rate=0.01, global_path=None,
+                                  change_res=True, init_resolution=4, data_type='path', path=None, vf0=True,
+                                  inverse=False, optim_template=True, add_padding=False, pad_size=2, window=3):
     n = len(data)
+    if data_type == 'path':
+        if optim_template:
+            if path is None:
+                if global_path is None:
+                    raise TypeError('Variable global path should be initialized')
+                path = [global_path + 'template_dev_' + data[i].split('/nii/')[0].split('/data/')[-1] + '.pkl'
+                                                                                    for i in range(n)]
+        else:
+            path=['' for i in range(n)]
+
+
 
     result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(delayed(one_to_one)(data1=data[i],
-                                                                                   data2=template,
-                                                                       a=a, b=b,
-                                                                       epsilon=epsilon,
-                                                                       ssd_var=ssd_var,
-                                                                       n_steps=n_steps,
-                                                                       n_iters=n_iters,
-                                                                       resolutions=resolutions,
-                                                                       smoothing_sigmas=smoothing_sigmas,
-                                                                       delta_phi_threshold=delta_phi_threshold,
-                                                                       unit_threshold=unit_threshold,
-                                                                       learning_rate=learning_rate,
-                                                                       n_jobs=1, vf0=vf0, inverse=inverse,
-                                                                       optim_template=optim_template,
-                                                                       data_type=data_type,
-                                                                       change_res=change_res,
-                                                                       init_resolution=init_resolution,
-                                                                       pipe_template=True)
+                                                                   data2=template,
+                                                                   a=a, b=b,
+                                                                   epsilon=epsilon,
+                                                                   ssd_var=ssd_var,
+                                                                   n_steps=n_steps,
+                                                                   n_iters=n_iters,
+                                                                   resolutions=resolutions,
+                                                                   smoothing_sigmas=smoothing_sigmas,
+                                                                   delta_phi_threshold=delta_phi_threshold,
+                                                                   unit_threshold=unit_threshold,
+                                                                   learning_rate=learning_rate,
+                                                                   n_jobs=1, vf0=vf0, inverse=inverse,
+                                                                   optim_template=optim_template,
+                                                                   data_type=data_type,
+                                                                   path=path[i],
+                                                                   change_res=change_res,
+                                                                   init_resolution=init_resolution,
+                                                                   pipe_template=True,
+                                                                   add_padding=add_padding,
+                                                                   pad_size=pad_size, window=window)
                                                                for i in tqdm(range(n), desc="registration"))
 
     if optim_template:
-        return derivatives_of_pipeline_with_template(result, train_idx, n, n_job)
+        gc.collect()
+        return derivatives_of_pipeline_with_template(result, train_idx, n)
 
     else:
+        gc.collect()
         return derivatives_of_pipeline(result, n)
+
+
 
 
 def count_dist_matrix(data, y, a, b, idx_train=None, idx_test=None, n_job=5, ssd_var=1000., n_steps=20,
                       n_iters=(50, 20, 10), resolutions=(4, 2, 1), smoothing_sigmas=(2., 1., 0.),
                       delta_phi_threshold=0.1, unit_threshold=0.01, learning_rate=0.01,
-                      inverse=True, change_res=True, init_resolution=4, data_type='path'):
+                      inverse=True, change_res=True, init_resolution=4, data_type='path', add_padding=False,
+                      pad_size=2):
     if idx_train is None:
-        idx_train = []
+        idx_train = np.arange(len(data))
     if idx_test is None:
         idx_test = []
 
@@ -203,7 +261,8 @@ def count_dist_matrix(data, y, a, b, idx_train=None, idx_test=None, n_job=5, ssd
                             unit_threshold=unit_threshold, learning_rate=learning_rate,
                             n_jobs=1, vf0=False, inverse=inverse,
                             optim_template=False, data_type=data_type, change_res=change_res,
-                            init_resolution=init_resolution, pipe_template=False)
+                            init_resolution=init_resolution, pipe_template=False,
+                            add_padding=add_padding, pad_size=pad_size)
         for i, idx1 in tqdm(enumerate(idx_train), desc='train') for idx2 in idx_train[i:])
 
     train_metric, train_vector_fields = map(np.concatenate, zip(*train_result))
@@ -214,7 +273,7 @@ def count_dist_matrix(data, y, a, b, idx_train=None, idx_test=None, n_job=5, ssd
 
     if n_test != 0:
         test_result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(
-            delayed(one_to_one)(data1=copy.deepcopy(data[idx1]), data2=copy.deepcopy(data[idx2]), a=a, b=b,
+            delayed(one_to_one)(data1=data[idx1], data2=data[idx2], a=a, b=b,
                                 ssd_var=ssd_var, n_steps=n_steps, n_iters=n_iters,
                                 resolutions=resolutions, smoothing_sigmas=smoothing_sigmas,
                                 delta_phi_threshold=delta_phi_threshold,

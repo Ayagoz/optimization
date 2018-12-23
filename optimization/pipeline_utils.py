@@ -1,33 +1,37 @@
-try:
-    import rtk
-except:
-    import os
-    import sys
+import os
+import sys
 
-    module_path = '~/src/rtk/'
-    if module_path not in sys.path:
-        sys.path.append(module_path)
-    PACKAGE_PARENT = '..'
-    SCRIPT_DIR = os.path.dirname(module_path)
-    sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
-    import rtk
+module_path = '~/src/rtk/'
+if module_path not in sys.path:
+    sys.path.append(module_path)
+PACKAGE_PARENT = '..'
+SCRIPT_DIR = os.path.dirname(module_path)
+sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
+import rtk
 
 import numpy as np
-import nibabel as nib
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
 from RegOptim.ml.ml_utils import expand_dims
-from RegOptim.utils import load_images, load_nii
+from RegOptim.utils import load_images, load_nii, save_nii
 from RegOptim.preprocessing import change_resolution
 from .derivatives import get_derivative_Lv
-from RegOptim.image_utils import get_contour2D, get_contour3D, pad_images, check_for_padding
+from RegOptim.image_utils import get_contour2D, get_contour3D, padding
 
 from pathlib2 import Path
-import os
+import pickle
+import gc
 
 
-def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, inverse=False):
+def optim_template_strategy(it, k=10):
+    if it % k == 0:
+        return True
+    else:
+        return False
+
+
+def create_template(path_to_data, train_idx, exp_path, template_name, resolution, sigma=0.01, inverse=False):
     images = []
     Path(exp_path).mkdir(exist_ok=True)
 
@@ -35,7 +39,7 @@ def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, i
 
     Path(path_to_template).mkdir(exist_ok=True)
 
-    if isinstance(path_to_data[0], (str, np.string_)):
+    if isinstance(path_to_data[0], (str, np.string_, np.unicode_)):
         images = load_images(path_to_data[np.ix_(train_idx)])
 
     if isinstance(path_to_data[0], np.ndarray):
@@ -46,19 +50,19 @@ def create_template(path_to_data, train_idx, exp_path, resolution, sigma=0.01, i
 
     images = np.array(images)
     template = np.mean(images, axis=0)
+
     if inverse:
         template = change_resolution(template, 1 / float(resolution), sigma, multiple=False)
 
-    template_nifty = nib.Nifti1Image(template, np.eye(4))
-    nib.save(template_nifty, path_to_template)
+    save_nii(template, os.path.join(path_to_template, template_name))
     return template
 
 
-def update_template(template_path, delta, it, learning_rate=0.1):
-    if isinstance(template_path, (str, np.string_, np.str)):
-        image = load_nii(template_path)
+def update_template(template, template_path, template_name, delta, learning_rate=0.1):
+    if isinstance(template, (str, np.string_, np.str, np.unicode_)):
+        image = load_nii(template)
     else:
-        image = template_path.copy()
+        image = template.copy()
 
     if image.shape != delta.shape:
         print 'Error not correct shape or resolution'
@@ -66,29 +70,28 @@ def update_template(template_path, delta, it, learning_rate=0.1):
 
     image -= learning_rate * delta
 
-    new_image = nib.Nifti1Image(image, np.eye(4))
-    new_path = template_path.split('.nii')[0] + '_' + str(it) + '.nii'
-    nib.save(new_image, new_path)
+    save_nii(image, os.path.join(template_path, template_name))
 
-    if isinstance(template_path, np.ndarray):
+    if isinstance(template, np.ndarray):
         return image
 
-    if isinstance(template_path, (str, np.string_, np.str)):
-        return new_path
-
-
-def pad_template_data_after_loop(template_delta, data, pad_size=2, ndim=3):
-    if isinstance(template_delta, (str, np.str, np.string_)):
-        image = load_nii(template_delta)
+    elif isinstance(template, (str, np.string_, np.str, np.unicode_)):
+        return os.path.join(template_path, template_name)
     else:
-        image = template_delta.copy()
+        raise TypeError('Unknown type of template')
 
-    if check_for_padding(image):
-        padded_template = pad_images([template_delta], pad_size, ndim)
-        padded_data = pad_images(data, pad_size, ndim)
-        return padded_template, padded_data
+
+def pad_template_data_after_loop(template, template_path, pad_size=2, save=True, ndim=3):
+    if isinstance(template, (str, np.str, np.string_, np.unicode_)):
+        image = load_nii(template)
     else:
-        return template_delta, data
+        image = template.copy()
+
+    padded_template = padding(image, pad_size=pad_size, ndim=ndim)
+    if save:
+        save_nii(padded_template, template_path)
+
+    return padded_template
 
 
 def binarize(delta):
@@ -100,10 +103,13 @@ def binarize(delta):
 
 def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3):
     bin_delta = binarize(delta)
+
     if ndim == 3:
-        contour_delta = get_contour3D(bin_delta, axis, contour_color, width, mask=True)
+        contour_delta = get_contour3D(image=bin_delta, axis=axis, contour_color=contour_color,
+                                      width=width, mask=True)
     elif ndim == 2:
-        contour_delta = get_contour2D(bin_delta, contour_color, width, mask=True)
+        contour_delta = get_contour2D(image=bin_delta, contour_color=contour_color,
+                                      width=width, mask=True)
     else:
         raise TypeError('Do not support images of ndim not equal 2 or 3')
 
@@ -135,23 +141,23 @@ def path_length(A, vf, a, b):
     # dLv/da = 2(a*delta^2 + b*delta)*v - shape (ndim, image_shape)
     # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v - shape (ndim, image_shape)
     # shape of this dLv_da - (n_steps, ndim, image_shape)
-    dLv_da, dLv_db = np.array([get_derivative_Lv(A, vf[i], a, b) for i in range(len(vf))]).T
+    dLv_da, dLv_db = np.array([get_derivative_Lv(A=A, vf=vf[i], a=a, b=b) for i in range(len(vf))]).T
     # axis (ndim, image_shape)
     axis = tuple(np.arange(vf.shape)[1:])
-    # sum by space dimentions
+    # sum by space dimensions
     da, db = np.sum(dLv_da * vf, axis=axis), np.sum(dLv_db * vf, axis=axis)
-    # by time dimention (approx integral)
+    # by time dimensions (approx integral)
     da = 0.5 * (da[:-1] + da[1:])
     db = 0.5 * (db[:-1] + db[1:])
 
-    return [da], [db]
+    return da, db
 
 
 def count_da_db_without_template(vf, a, b, shape, n_job, n):
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
 
     regularizer.set_operator(shape=shape)
-    train_devs = Parallel(n_jobs=n_job)(delayed(path_length)(regularizer.A, vf[i], a, b)
+    train_devs = Parallel(n_jobs=n_job)(delayed(path_length)(A=regularizer.A, vf=vf[i], a=a, b=b)
                                         for i in tqdm(range(len(vf)), desc='da_db_train'))
 
     train_da, train_db = map(np.concatenate, zip(*train_devs))
@@ -191,15 +197,23 @@ def count_da_db_with_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
     return da, db
 
 
-def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim):
-    # we want to differenciate K(kernel) by J (template)
+def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, mode='path'):
+    # we want to differentiate K(kernel) by J (template)
     # K_ij = <Lv_i, v_j>
     # dK/dJ = <Ldv_i/dJ, v_j> + <Lv_i, dv_j/dJ>
     # <Ldv_i/dJ, v_j> = <dv_i/dJ, Lv_j>, because L - is self-adjoint
     # dK/dJ = <dv_i/dJ, Lv_j> + <Lv_i, dv_j/dJ>
+
+
+    if mode == 'path':
+        with open(dv_dJ_i, 'rb') as f:
+            dv_dJ_i = pickle.load(f).astype(np.float32)
+        with open(dv_dJ_j, 'rb') as f:
+            dv_dJ_j = pickle.load(f).astype(np.float32)
+
     axis = tuple(np.arange(Lvfs_i.ndim))
     # np.sum(b[0] * a[..., None, None], axis=(1,2,3,4))
     dK_dJ = np.sum(dv_dJ_i * expand_dims(Lvfs_j, ndim), axis=axis) + \
             np.sum(expand_dims(Lvfs_i, ndim) * dv_dJ_j, axis=axis)
-
+    gc.collect()
     return dK_dJ

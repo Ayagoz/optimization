@@ -212,6 +212,7 @@ def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, mode='path'):
             dv_dJ_j = pickle.load(f).astype(np.float32)
 
     axis = tuple(np.arange(Lvfs_i.ndim))
+    
     # np.sum(b[0] * a[..., None, None], axis=(1,2,3,4))
     dK_dJ = np.sum(dv_dJ_i * expand_dims(Lvfs_j, ndim), axis=axis) + \
             np.sum(expand_dims(Lvfs_i, ndim) * dv_dJ_j, axis=axis)

@@ -13,9 +13,10 @@ from rtk.registration.LDDMM import derivative
 
 import numpy as np
 from scipy.fftpack import fftn, ifftn
+from scipy.sparse import coo_matrix
 
 from RegOptim.preprocessing import to_one_resolution
-from .template_utils import sparse_dot_product
+from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v
 import pickle
 import gc
 
@@ -64,7 +65,7 @@ def get_resulting_dv(reg, regularizer, vf0, inverse):
                              vf0=vf0, inverse=inverse)
 
 
-def dv(reg, a, b, vf, epsilon, name_of_param, vf0, inverse):
+def dv(reg, a, b, epsilon, name_of_param, vf0, inverse):
     # set first regularizer with a + epsilon
     if name_of_param == 'convexity':
         regularizer1 = rtk.BiharmonicRegularizer(convexity_penalty=a + epsilon, norm_penalty=b)
@@ -75,7 +76,7 @@ def dv(reg, a, b, vf, epsilon, name_of_param, vf0, inverse):
         regularizer2 = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b - epsilon)
 
     else:
-        raise TypeError
+        raise TypeError('No such metric parameter')
 
     # compute resulting vector fields
     vf1 = get_resulting_dv(reg, regularizer1, vf0, inverse)
@@ -83,11 +84,11 @@ def dv(reg, a, b, vf, epsilon, name_of_param, vf0, inverse):
     # count resulting vector fields
     vf2 = get_resulting_dv(reg, regularizer2, vf0, inverse)
     del regularizer1, regularizer2
-    # f''(x) = (f(x+e) - 2f(x)+f(x-e))/e^2
-    return (vf1 - 2 * vf + vf2) / epsilon ** 2
+    # f'(x) = (f(x+e) - f(x-e))/(2*e)
+    return (vf1 - vf2) / (2*epsilon)
 
 
-def get_derivative_v(a, b, reg, vf, epsilon=0.1, vf0=True, inverse=True, data=None, template=None):
+def get_derivative_v(a, b, reg, epsilon=0.1, vf0=True, inverse=True, data=None, template=None):
     # check if exist fixed and moving images
     if not hasattr(reg, 'fixed'):
         # inverse means that we would like to find path from X to template
@@ -101,15 +102,15 @@ def get_derivative_v(a, b, reg, vf, epsilon=0.1, vf0=True, inverse=True, data=No
         else:
             reg.set_images(rtk.ScalarImage(data=data), rtk.ScalarImage(data=template))
 
-    dv_da = dv(reg=reg, a=a, b=b, vf=vf, epsilon=epsilon, name_of_param='convexity', vf0=vf0, inverse=inverse)
-    dv_db = dv(reg=reg, a=a, b=b, vf=vf, epsilon=epsilon, name_of_param='normalization',
+    dv_da = dv(reg=reg, a=a, b=b, epsilon=epsilon, name_of_param='convexity', vf0=vf0, inverse=inverse)
+    dv_db = dv(reg=reg, a=a, b=b, epsilon=epsilon, name_of_param='normalization',
                vf0=vf0, inverse=inverse)
 
     return dv_da, dv_db
 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
-                            similarity, regularizer, vf0, inverse, path, n_jobs=5, window=3):
+                            similarity, regularizer, vf0, inverse, path, n_jobs=5, window=3, protocol=2):
     if inverse:
         template_img = rtk.ScalarImage(data=template)
         moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=data), n_steps)
@@ -143,19 +144,26 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
 
     if vf0:
         # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
-        shape_res = (1, template.ndim) + template.shape + template.shape
+        if path is not None:
+            shape_res = (template.ndim,) + template.shape + template.shape
+        else:
+            shape_res = (1, template.ndim) + template.shape + template.shape
     else:
         shape_res = (n_steps + 1, template.ndim) + template.shape + template.shape
     # get I composed with phi
     del template_img
     #
-    dl_dJ = (-2 * (moving_imgs[-1] - template)).reshape(1,-1)
-    #if you want to use sparsity
+    dl_dv = - similarity.derivative(moving_imgs[-1], template_img) * deformation.backward_dets[-1] / \
+            np.array(moving_imgs[-1] - template_img).astype(np.float)
+    # if you want to use sparsity
     # dv_dJ = sparse_dot_product(vector=inv_grad_v, mat_shape=shape_res[:-template.ndim], window=window,
     #                            mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ)
-    dv_dJ = inv_grad_v.dot(dl_dJ)
+    dl_dJ_dv = double_dev_J_v(dl_dv)
+
+    dv_dJ = sparse_dot_product(vector=inv_grad_v, mat_shape=shape_res[:-template.ndim], window=window,
+                               mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
     del moving_imgs
-    del dl_dJ, inv_grad_v
+    del dl_dv, inv_grad_v, dl_dJ_dv
 
     gc.collect()
 
@@ -163,9 +171,9 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
 
     if path is not None:
         with open(path, 'wb') as f:
-            pickle.dump(dv_dJ, f, protocol=2)
+            pickle.dump(dv_dJ, f, protocol=protocol)
 
         del dv_dJ
         return [path]
     else:
-        return  dv_dJ
+        return dv_dJ

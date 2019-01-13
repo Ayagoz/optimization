@@ -13,7 +13,7 @@ import numpy as np
 import copy
 import gc
 from tqdm import tqdm
-from memory_profiler import profile
+# from memory_profiler import profile
 from joblib import Parallel, delayed
 
 
@@ -163,15 +163,16 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total):
     else:
         mode='array'
         
-    print count_dJ(Lvfs[0], Lvfs[0], dv_dJ[0], dv_dJ[0], ndim, mode=mode).shape
     dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim, mode=mode)
                          for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
                          for idx2 in train_idx[i:]])
+    k, l = np.tril_indices(n_train, 0)
+    dJ[k, l] = dJ[i, j]
 
     K = count_K_with_template(Lvfs, vfs, n_total)
     da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
     gc.collect()
-    return K, da, db, dJ + dJ.T - dJ.diagonal()
+    return K, da, db, dJ
 
 
 # @profile

@@ -1,12 +1,4 @@
 import os
-import sys
-
-module_path = '~/src/rtk/'
-if module_path not in sys.path:
-    sys.path.append(module_path)
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(module_path)
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 import rtk
 
 import numpy as np
@@ -18,12 +10,13 @@ from joblib import Parallel, delayed
 
 
 from RegOptim.optimization.derivatives import to_one_resolution, get_derivative_Lv, get_derivative_v, \
-    get_derivative_template
-from RegOptim.optimization.pipeline_utils import count_dJ, count_K_with_template, count_da_db_with_template
-from RegOptim.optimization.pipeline_utils import count_K_without_template, count_da_db_without_template
+    get_derivative_template, derivatives_of_pipeline_with_template, \
+    derivatives_of_pipeline_without_template
 from RegOptim.utils import load_nii
 from RegOptim.preprocessing import change_resolution
 from RegOptim.image_utils import padding
+from RegOptim.optimization.pipeline_utils import create_exp_folders, create_template, count_K_pairwise,\
+    count_da_db_pairwise
 
 joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 
@@ -64,7 +57,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         dLv_da, dLv_db = Deltas_v[:, 0], Deltas_v[:, 1]
         del Deltas_v
     # after that will be change reg so, save everything what you need
-    dv_da, dv_db = get_derivative_v(a=a, b=b, reg=copy.deepcopy(reg), vf=in_one_res,
+    dv_da, dv_db = get_derivative_v(a=a, b=b, reg=copy.deepcopy(reg),
                                     epsilon=epsilon, vf0=vf0, inverse=inverse, data=data,
                                     template=template)
 
@@ -84,7 +77,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
 def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
                n_iters, resolutions, smoothing_sigmas,
                delta_phi_threshold, unit_threshold, learning_rate, n_jobs,
-               vf0, inverse, optim_template, data_type='path', path=None,
+               vf0, inverse, optim_template, data_type='path', path_to_dJ=None,
                change_res=True, init_resolution=4., pipe_template=True,
                add_padding=False, pad_size=2, window=3):
     # registration
@@ -104,9 +97,9 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
 
     if data_type == 'path':
         data1 = load_nii(data1)
-    else:
-        if path is None:
-            raise  TypeError('Variable `path` should be initialized.')
+
+    if path_to_dJ is None:
+        raise  TypeError('Variable `path` should be initialized.')
 
     if isinstance(data2, (str, np.str, np.string_, np.unicode_)):
         data2 = load_nii(data2)
@@ -142,67 +135,29 @@ def one_to_one(data1, data2, a, b, epsilon, ssd_var, n_steps,
                                              data=data1, template=data2, a=a, b=b,
                                              epsilon=epsilon, shape=data1.shape, vf0=vf0,
                                              inverse=inverse, optim_template=optim_template,
-                                             n_jobs=n_jobs, path=path, window=window)
+                                             n_jobs=n_jobs, path=path_to_dJ, window=window)
 
     else:
         gc.collect()
         return pairwise_pipeline_derivatives(reg, inverse)
 
 
-def derivatives_of_pipeline_with_template(result, train_idx, n_total):
-    n_train = len(train_idx)
-    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
-    shape = np.array(Lvfs).shape[2:]
-    ndim = len(shape)
-
-    dJ = np.zeros((n_train, n_train) + shape)
-    i, j = np.triu_indices(n_train, 0)
-    
-    if isinstance(dv_dJ[0], (str, np.str, np.string_, np.unicode, np.unicode_)):
-        mode='path'
-    else:
-        mode='array'
-        
-    dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim, mode=mode)
-                         for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
-                         for idx2 in train_idx[i:]])
-    k, l = np.tril_indices(n_train, 0)
-    dJ[k, l] = dJ[i, j]
-
-    K = count_K_with_template(Lvfs, vfs, n_total)
-    da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-    gc.collect()
-    return K, da, db, dJ
-
-
-# @profile
-def derivatives_of_pipeline(result, n_total):
-    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db = map(np.concatenate, zip(*result))
-    K = count_K_with_template(Lvfs, vfs, n_total)
-    da, db = count_da_db_with_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-    gc.collect()
-    return K, da, db
-
-
 # @profile
 def count_dist_matrix_to_template(data, template, a, b, train_idx, epsilon=0.1, n_job=5, ssd_var=1000.,
                                   n_steps=30, n_iters=(50, 20, 10), resolutions=(4, 2, 1),
                                   smoothing_sigmas=(2., 1., 0.), delta_phi_threshold=0.1,
-                                  unit_threshold=0.01, learning_rate=0.01, global_path=None,
-                                  change_res=True, init_resolution=4, data_type='path', path=None, vf0=True,
-                                  inverse=False, optim_template=True, add_padding=False, pad_size=2, window=3):
+                                  unit_threshold=0.01, learning_rate=0.01, exp_path=None,
+                                  change_res=True, init_resolution=4, data_type='path', vf0=True,
+                                  inverse=False, optim_template=True, add_padding=False, pad_size=2,
+                                  window=3):
     n = len(data)
-    if data_type == 'path':
-        if optim_template:
-            if path is None:
-                if global_path is None:
-                    raise TypeError('Variable global path should be initialized')
-                path = [global_path + 'template_dev_' + data[i].split('/nii/')[0].split('/data/')[-1] + '.pkl'
-                                                                                    for i in range(n)]
-        else:
-            path=['' for i in range(n)]
+    if exp_path is None:
+        raise TypeError('exp path cannot be None')
 
 
+    path_to_dJ = os.path.join(exp_path, 'derivative/')
+    path = [path_to_dJ + 'template_dev_' + data[i].split('/nii/')[0].split('/data/')[-1] + '.pkl'
+                                                                                for i in range(n)]
 
     result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(delayed(one_to_one)(data1=data[i],
                                                                    data2=template,
@@ -233,7 +188,7 @@ def count_dist_matrix_to_template(data, template, a, b, train_idx, epsilon=0.1, 
 
     else:
         gc.collect()
-        return derivatives_of_pipeline(result, n)
+        return derivatives_of_pipeline_without_template(result, n)
 
 
 
@@ -245,6 +200,7 @@ def count_dist_matrix(data, y, a, b, idx_train=None, idx_test=None, n_job=5, ssd
                       pad_size=2):
     if idx_train is None:
         idx_train = np.arange(len(data))
+
     if idx_test is None:
         idx_test = []
 
@@ -268,9 +224,9 @@ def count_dist_matrix(data, y, a, b, idx_train=None, idx_test=None, n_job=5, ssd
 
     train_metric, train_vector_fields = map(np.concatenate, zip(*train_result))
 
-    train_K = count_K_without_template(train_metric, n_train)
+    train_K = count_K_pairwise(train_metric, n_train)
     shape = train_vector_fields.shape[2:]
-    train_da, train_db = count_da_db_without_template(train_vector_fields, a, b, shape, n_job, n_train)
+    train_da, train_db = count_da_db_pairwise(train_vector_fields, a, b, shape, n_job, n_train)
 
     if n_test != 0:
         test_result = Parallel(n_jobs=n_job, temp_folder=joblib_folder)(

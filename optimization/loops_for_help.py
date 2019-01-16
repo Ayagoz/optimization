@@ -10,7 +10,7 @@ from RegOptim.ml.ml_utils import diff_K_exp_kernel, diff_J_kernel
 from RegOptim.ml.ml_utils import diff_loss_by_a_b, diff_loss_by_J
 from RegOptim.ml.ml_utils import MLE_l2_loss
 
-def count_grads_kernel_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, random_state=0):
+def count_grads_a_b_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, random_state=0, kernel=False):
     roc_aucs = []
     grads_a, grads_b = [], []
     grads_J = []
@@ -35,13 +35,22 @@ def count_grads_kernel_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=
         roc_aucs.append(roc_auc_score(y_test, proba_test))
         losses.append(MLE_l2_loss(y_test, log_proba, lr.coef_))
 
-        da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
-                                              K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
-                                              K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
+        if kernel:
+            da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
+                                                  K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
+                                                  K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
 
-        db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
-                                              K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
-                                              K_test=exp_test, dK_test=db[np.ix_(idx_test, idx_train)])
+            db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
+                                                  K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
+                                                  K_test=exp_test, dK_test=db[np.ix_(idx_test, idx_train)])
+
+            dJ_train, dJ_test = diff_J_kernel(alpha=params['kernel__gamma'],
+                                              K_train=exp_train, dK_train=dJ[np.ix_(idx_train, idx_train)],
+                                              K_test=exp_test, dK_test=dJ[np.ix_(idx_test, idx_train)], ndim=ndim)
+        else:
+            da_train, da_test = da[np.ix_(idx_train, idx_train)], da[np.ix_(idx_test, idx_train)]
+            db_train, db_test = db[np.ix_(idx_train, idx_train)], db[np.ix_(idx_test, idx_train)]
+            dJ_train, dJ_test = dJ[np.ix_(idx_train, idx_train)], dJ[np.ix_(idx_test, idx_train)]
 
         grad_a, grad_b, H = diff_loss_by_a_b(dK_da_train=da_train, dK_da_test=da_test,
                                              dK_db_train=db_train, dK_db_test=db_test,
@@ -51,9 +60,7 @@ def count_grads_kernel_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=
                                              beta=lr.coef_
                                              )
 
-        dJ_train, dJ_test = diff_J_kernel(alpha=params['kernel__gamma'],
-                                          K_train=exp_train, dK_train=dJ[np.ix_(idx_train,idx_train)],
-                                          K_test=exp_test, dK_test=dJ[np.ix_(idx_test, idx_train)], ndim=ndim)
+
 
         grad_J = diff_loss_by_J(dK_dJ_train=dJ_train, dK_dJ_test=dJ_test,
                                 K_train=exp_train, K_test=exp_test,
@@ -68,7 +75,7 @@ def count_grads_kernel_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=
     return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs), np.mean(losses)
 
 
-def count_grads_kernel(exp_K, da, db, y, params, n_splits=10, ndim=3, random_state=0):
+def count_grads_a_b(exp_K, da, db, y, params, n_splits=10, random_state=0, kernel=False):
     roc_aucs = []
     grads_a, grads_b = [], []
     losses = []
@@ -92,14 +99,18 @@ def count_grads_kernel(exp_K, da, db, y, params, n_splits=10, ndim=3, random_sta
 
         roc_aucs.append(roc_auc_score(y_test, proba_test))
         losses.append(loss)
+        if kernel:
 
-        da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
-                                              K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
-                                              K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
+            da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
+                                                  K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
+                                                  K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
 
-        db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
-                                              K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
-                                              K_test=exp_test, dK_test=db[np.ix_(idx_test, idx_train)])
+            db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
+                                                  K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
+                                                  K_test=exp_test, dK_test=db[np.ix_(idx_test, idx_train)])
+        else:
+            da_train, da_test = da[np.ix_(idx_train, idx_train)], da[np.ix_(idx_test, idx_train)]
+            db_train, db_test = db[np.ix_(idx_train, idx_train)], db[np.ix_(idx_test, idx_train)]
 
         grad_a, grad_b, H = diff_loss_by_a_b(dK_da_train=da_train, dK_da_test=da_test,
                                              dK_db_train=db_train, dK_db_test=db_test,
@@ -116,7 +127,7 @@ def count_grads_kernel(exp_K, da, db, y, params, n_splits=10, ndim=3, random_sta
     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs), np.mean(losses)
 
 
-def test_score_prediction_kernel_scaled(K, y, idx_train, idx_test, params):
+def test_score_prediction_scaled(K, y, idx_train, idx_test, params):
 
     K_train, y_train = K[np.ix_(idx_train, idx_train)], y[np.ix_(idx_train)]
     K_test, y_test = K[np.ix_(idx_test, idx_train)], y[np.ix_(idx_test)]

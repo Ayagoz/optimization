@@ -1,12 +1,4 @@
 import os
-import sys
-
-module_path = '~/src/rtk/'
-if module_path not in sys.path:
-    sys.path.append(module_path)
-PACKAGE_PARENT = '..'
-SCRIPT_DIR = os.path.dirname(module_path)
-sys.path.append(os.path.normpath(os.path.join(SCRIPT_DIR, PACKAGE_PARENT)))
 import rtk
 
 import numpy as np
@@ -22,6 +14,7 @@ from RegOptim.image_utils import get_contour2D, get_contour3D, padding
 from pathlib2 import Path
 import pickle
 import gc
+import json
 
 
 def optim_template_strategy(it, k=10):
@@ -31,13 +24,25 @@ def optim_template_strategy(it, k=10):
         return False
 
 
-def create_template(path_to_data, train_idx, exp_path, template_name, resolution, sigma=0.01, inverse=False):
-    images = []
+def create_exp_folders(exp_path, params=None):
     Path(exp_path).mkdir(exist_ok=True)
 
-    path_to_template = os.path.join(exp_path, 'templates/')
+    if params is not None:
+        json.dump(params, open(os.path.join(exp_path, 'pipeline_params.txt'), 'w'))
 
+    path_to_template = os.path.join(exp_path, 'templates/')
     Path(path_to_template).mkdir(exist_ok=True)
+
+    path_to_dJ = os.path.join(exp_path, 'derivative/')
+    Path(path_to_dJ).mkdir(exist_ok=True)
+
+    path_to_kernels = os.path.join(exp_path, 'kernel/')
+    Path(path_to_kernels).mkdir(exist_ok=True)
+
+
+def create_template(path_to_data, train_idx, path_to_template, template_name,
+                    resolution, sigma=0.01, inverse=False):
+    images = []
 
     if isinstance(path_to_data[0], (str, np.string_, np.unicode_)):
         images = load_images(path_to_data[np.ix_(train_idx)])
@@ -81,7 +86,7 @@ def update_template(template, template_path, template_name, delta, learning_rate
         raise TypeError('Unknown type of template')
 
 
-def pad_template_data_after_loop(template, template_path, pad_size=2, save=True, ndim=3):
+def pad_template_data_after_loop(template, path_to_template, pad_size=2, save=True, ndim=3):
     if isinstance(template, (str, np.str, np.string_, np.unicode_)):
         image = load_nii(template)
     else:
@@ -89,15 +94,13 @@ def pad_template_data_after_loop(template, template_path, pad_size=2, save=True,
 
     padded_template = padding(image, pad_size=pad_size, ndim=ndim)
     if save:
-        save_nii(padded_template, template_path)
-
+        save_nii(padded_template, path_to_template)
     return padded_template
 
 
 def binarize(delta):
     bin_delta = delta.copy()
     bin_delta[delta != 0] = 1.
-
     return bin_delta
 
 
@@ -116,7 +119,7 @@ def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3)
     return delta * contour_delta
 
 
-def count_K_with_template(Lvf, vf, n):
+def count_K_to_template(Lvf, vf, n):
     K = np.zeros((n, n))
     # vf  shape (n_samples, t, ndim, img_shape)
     axis = tuple(np.arange(vf.ndim)[1:])
@@ -128,7 +131,7 @@ def count_K_with_template(Lvf, vf, n):
     return K
 
 
-def count_K_without_template(metrics, n):
+def count_K_pairwise(metrics, n):
     K = np.zeros((n, n))
     i, j = np.triu_indices(n=n, k=0)
     K[i, j] = metrics
@@ -141,7 +144,7 @@ def path_length(A, vf, a, b):
     # dLv/da = 2(a*delta^2 + b*delta)*v - shape (ndim, image_shape)
     # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v - shape (ndim, image_shape)
     # shape of this dLv_da - (n_steps, ndim, image_shape)
-    dLv_da, dLv_db = np.array([get_derivative_Lv(A=A, vf=vf[i], a=a, b=b) for i in range(len(vf))]).T
+    dLv_da, dLv_db = np.array([get_derivative_Lv(A=A, v=vf[i], a=a, b=b) for i in range(len(vf))]).T
     # axis (ndim, image_shape)
     axis = tuple(np.arange(vf.shape)[1:])
     # sum by space dimensions
@@ -153,10 +156,10 @@ def path_length(A, vf, a, b):
     return da, db
 
 
-def count_da_db_without_template(vf, a, b, shape, n_job, n):
+def count_da_db_pairwise(vf, a, b, shape, n_job, n):
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
-
     regularizer.set_operator(shape=shape)
+
     train_devs = Parallel(n_jobs=n_job)(delayed(path_length)(A=regularizer.A, vf=vf[i], a=a, b=b)
                                         for i in tqdm(range(len(vf)), desc='da_db_train'))
 
@@ -172,7 +175,7 @@ def count_da_db_without_template(vf, a, b, shape, n_job, n):
     return da + da.T - da.diagonal(), db + db.T - db.diagonal()
 
 
-def count_da_db_with_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
+def count_da_db_to_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
     da = np.zeros((n, n))
     # dv_da = (v(a + e) - 2*v(a) + v(a-e))/e^2, shape(n_sample, t, ndim, img_shape)
     # dLv = dL/da * v, shape (n_samples, t, ndim, img_shape)
@@ -204,7 +207,6 @@ def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, mode='path'):
     # <Ldv_i/dJ, v_j> = <dv_i/dJ, Lv_j>, because L - is self-adjoint
     # dK/dJ = <dv_i/dJ, Lv_j> + <Lv_i, dv_j/dJ>
 
-
     if mode == 'path':
         with open(dv_dJ_i, 'rb') as f:
             dv_dJ_i = pickle.load(f).astype(np.float32)
@@ -212,7 +214,7 @@ def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, mode='path'):
             dv_dJ_j = pickle.load(f).astype(np.float32)
 
     axis = tuple(np.arange(Lvfs_i.ndim))
-    
+
     # np.sum(b[0] * a[..., None, None], axis=(1,2,3,4))
     dK_dJ = np.sum(dv_dJ_i * expand_dims(Lvfs_j, ndim), axis=axis) + \
             np.sum(expand_dims(Lvfs_i, ndim) * dv_dJ_j, axis=axis)

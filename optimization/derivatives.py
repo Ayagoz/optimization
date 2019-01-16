@@ -13,10 +13,12 @@ from rtk.registration.LDDMM import derivative
 
 import numpy as np
 from scipy.fftpack import fftn, ifftn
-from scipy.sparse import coo_matrix
 
 from RegOptim.preprocessing import to_one_resolution
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v
+from RegOptim.optimization.pipeline_utils import count_da_db_to_template, count_K_to_template, count_dJ
+
+from tqdm import tqdm
 import pickle
 import gc
 
@@ -107,6 +109,41 @@ def get_derivative_v(a, b, reg, epsilon=0.1, vf0=True, inverse=True, data=None, 
                vf0=vf0, inverse=inverse)
 
     return dv_da, dv_db
+
+
+def derivatives_of_pipeline_with_template(result, train_idx, n_total):
+    n_train = len(train_idx)
+    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
+    shape = np.array(Lvfs).shape[2:]
+    ndim = len(shape)
+
+    dJ = np.zeros((n_train, n_train) + shape)
+    i, j = np.triu_indices(n_train, 0)
+
+    if isinstance(dv_dJ[0], (str, np.str, np.string_, np.unicode, np.unicode_)):
+        mode = 'path'
+    else:
+        mode = 'array'
+
+    dJ[i, j] = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1], dv_dJ[idx2], ndim, mode=mode)
+                         for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
+                         for idx2 in train_idx[i:]])
+    k, l = np.tril_indices(n_train, 0)
+    dJ[k, l] = dJ[i, j]
+
+    K = count_K_to_template(Lvfs, vfs, n_total)
+    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
+    gc.collect()
+    return K, da, db, dJ
+
+
+# @profile
+def derivatives_of_pipeline_without_template(result, n_total):
+    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db = map(np.concatenate, zip(*result))
+    K = count_K_to_template(Lvfs, vfs, n_total)
+    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
+    gc.collect()
+    return K, da, db
 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,

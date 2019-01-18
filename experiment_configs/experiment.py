@@ -6,6 +6,7 @@ from RegOptim.optimization.pipeline_utils import create_exp_folders, create_temp
 from RegOptim.image_utils import check_for_padding
 from RegOptim.utils import load_data
 from RegOptim.experiment_configs.utils import save_params
+from RegOptim.experiment_configs.experiment_loop import pipeline_main_loop
 
 import numpy as np
 import json
@@ -16,7 +17,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 def metric_learning_to_template(PATH):
     #path to experiment config
-
+    print "START EXPERIMENT"
     pipeline_params = json.load(open(PATH, 'r'))
     #extract params to shorter usage
     path = pipeline_params['path']
@@ -32,7 +33,7 @@ def metric_learning_to_template(PATH):
 
 
     #create folder and path
-    create_exp_folders(experiment_path, pipeline_params=None)
+    create_exp_folders(experiment_path, params=pipeline_params)
 
     print 'experiment name: ', experiment_name
 
@@ -66,7 +67,12 @@ def metric_learning_to_template(PATH):
         pad_size = 0
 
 
+    pipeline_main_loop(data=data, template=template, y=y, idx_out_train=idx_out_train,
+                       idx_out_test=idx_out_test, experiment_path=experiment_path,
+                       path_to_template=path_to_template, template_name=template_name,
+                       pipeline_params=pipeline_params, pad_size=pad_size)
 
+    print "FINISHED"
 
 
 

@@ -17,7 +17,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
                        pipeline_params, pad_size):
     # initialize learning rate changing strategy
     lr_change = import_func(**pipeline_params['lr_type'])
-    lr_params = pipeline_params['lr_change_params'][pipeline_params['lr_type']]
+    lr_params = pipeline_params['lr_change_params'][pipeline_params['lr_type']['func']]
     lr = lr_params['init_lr']
     it = 1
     a_it = [0., pipeline_params['a_b'][0]]
@@ -45,10 +45,13 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
         print 'For params a {} and b {}'.format(a_it[-1], b_it[-1])
 
         if optim_template:
-            template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss = optimize_template_step(
+            template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding = optimize_template_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
                 pipeline_params, experiment_path, template_name, path_to_template, pad_size, it
             )
+            if add_padding:
+                pad_size += pipeline_params['registration_params']['pad_size']
+                pipeline_params['registration_params']['add_padding'] = add_padding
         else:
             best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss = optimize_a_b_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
@@ -90,12 +93,13 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
 
     template_updates = pipeline_params['template_updates']
     reg = pipeline_params['registration_params']
-
+    
+    add_padding = reg['add_padding']
     y_out_train = y[idx_out_train]
 
     K, da, db, dJ = count_dist_matrix_to_template(
         data, template, a, b, idx_out_train, epsilon=reg['epsilon'],
-        n_job=reg['n_job'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
+        n_job=reg['n_jobs'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
         resolutions=reg['resolutions'], smoothing_sigmas=reg['smoothing_sigmas'],
         delta_phi_threshold=reg['delta_phi_threshold'], unit_threshold=reg['unit_threshold'],
         learning_rate=reg['learning_rate'], change_res=reg['change_res'],
@@ -112,13 +116,13 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
         n_splits=pipeline_params['n_splits'], kernel=pipeline_params['kernel']
     )
 
-    test_score, test_loss = test_score_prediction(K, y, idx_out_train, idx_out_test,
-                                                  best_params, pipeline_params['scaled'])
+    test_score, test_loss = test_score_prediction(K=K, y=y, idx_train=idx_out_train, idx_test=idx_out_test,
+                                                  params=best_params)
 
     grads_da, grads_db, grads_dJ, train_score, train_loss = count_grads_template(
-        K_out_train, y_out_train, da[np.ix_(idx_out_train, idx_out_train)],
-        db[np.ix_(idx_out_train, idx_out_train)], best_params, dJ, pipeline_params['scaled'],
-        with_template=True, n_splits=pipeline_params['n_splits'], ndim=pipeline_params['ndim'],
+        exp_K=K_out_train, y=y_out_train, da=da[np.ix_(idx_out_train, idx_out_train)],
+        db=db[np.ix_(idx_out_train, idx_out_train)], dJ=dJ, params=best_params,
+        n_splits=pipeline_params['n_splits'], ndim=pipeline_params['ndim'],
         random_state=pipeline_params['random_state'], kernel=pipeline_params['kernel']
     )
 
@@ -136,12 +140,11 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
                                                 os.path.join(path_to_template, template_name),
                                                 pad_size=reg['pad_size'], ndim=pipeline_params['ndim'])
 
-        reg['add_padding'] = True
-        pad_size += reg['pad_size']
-
+        add_padding = True
+        
     gc.collect()
 
-    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss
+    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding 
 
 
 def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
@@ -154,7 +157,7 @@ def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
 
     K, da, db = count_dist_matrix_to_template(
         data, template, a, b, idx_out_train, epsilon=reg['epsilon'],
-        n_job=reg['n_job'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
+        n_job=reg['n_jobs'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
         resolutions=reg['resolutions'], smoothing_sigmas=reg['smoothing_sigmas'],
         delta_phi_threshold=reg['delta_phi_threshold'], unit_threshold=reg['unit_threshold'],
         learning_rate=reg['learning_rate'], change_res=reg['change_res'],
@@ -171,13 +174,13 @@ def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
         n_splits=pipeline_params['n_splits'], kernel=pipeline_params['kernel']
     )
 
-    test_score, test_loss = test_score_prediction(K, y, idx_out_train, idx_out_test,
-                                                  best_params, pipeline_params['scaled'])
+    test_score, test_loss = test_score_prediction(K=K, y=y, idx_train=idx_out_train, idx_test=idx_out_test,
+                                                  params=best_params)
 
     grads_da, grads_db, train_score, train_loss = count_grads_a_b(
-        K_out_train, y_out_train, da[np.ix_(idx_out_train, idx_out_train)], db[np.ix_(idx_out_train, idx_out_train)],
-        best_params, None, pipeline_params['scaled'], with_template=False, n_splits=pipeline_params['n_splits'],
-        ndim=pipeline_params['ndim'], random_state=pipeline_params['random_state'], kernel=pipeline_params['kernel']
+        exp_K=K_out_train, y=y_out_train, da=da[np.ix_(idx_out_train, idx_out_train)],
+        db=db[np.ix_(idx_out_train, idx_out_train)],
+        params=best_params, n_splits=pipeline_params['n_splits'], random_state=pipeline_params['random_state']
     )
 
     gc.collect()

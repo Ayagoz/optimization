@@ -1,11 +1,8 @@
-import warnings
-warnings.filterwarnings('ignore')
-
 from RegOptim.optimization.pipeline_utils import create_exp_folders, create_template, \
     pad_template_data_after_loop
 from RegOptim.image_utils import check_for_padding
-from RegOptim.utils import load_data
-from RegOptim.experiment_configs.utils import save_params
+from RegOptim.utils import get_subset
+from RegOptim.experiment_configs.utils import save_params, import_func
 from RegOptim.experiment_configs.experiment_loop import pipeline_main_loop
 
 import numpy as np
@@ -31,27 +28,37 @@ def metric_learning_to_template(PATH):
     path_to_template = os.path.join(experiment_path, 'templates/')
     template_name = 'template_0.nii'
 
-
+    load_data = import_func(**pipeline_params['load_func'])
     #create folder and path
     create_exp_folders(experiment_path, params=pipeline_params)
 
     print 'experiment name: ', experiment_name
+    
+    if path.get('path_to_meta', 0) == 0:
+        data, y = load_data(path['path_to_data'],
+                            target_type=exp_data['target_type'],
+                            file_type=exp_data['load_type'])
+    else:
+        data, y = load_data(path['path_to_data'], data_type=exp_data['data_type'],
+                    target_type=exp_data['target_type'],
+                    path_to_meta=path['path_to_meta'],
+                    file_type=exp_data['load_type'])
 
-    data, y = load_data(path['path_to_data'], data_type=exp_data['data_type'],
-                        target_type=exp_data['target_type'],
-                        path_to_meta=path['path_to_meta'],
-                        file_type=exp_data['load_type'])
+    if pipeline_params['subset'] is not None:
+        data, y = get_subset(data, y, pipeline_params['subset'], pipeline_params['random_state'])
+    print "Data size: ", data.shape, " target mean: ", y.mean() 
+    
     #create splits for (train+val) and test
     idx_out_train, idx_out_test = list(StratifiedShuffleSplit(n_splits=1, test_size=0.3,
                                                               random_state=random_state).split(
                                                                np.arange(len(data)), y))[0]
 
-    splits = {'train_val': idx_out_train, 'test': idx_out_test}
+    splits = {'train_val': idx_out_train.tolist(), 'test': idx_out_test.tolist()}
     save_params(experiment_path, 'splits_indices', splits)
 
 
     #create template on train data and save it
-    template = create_template(data, idx_out_train, experiment_path, template_name,
+    template = create_template(data, idx_out_train, os.path.join(experiment_path,'templates/'), template_name,
                                pipeline_params['resolution'])
 
     #check if template needs padding

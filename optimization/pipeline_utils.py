@@ -6,23 +6,33 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 
 from RegOptim.ml.ml_utils import expand_dims
-from RegOptim.utils import load_images, load_nii, save_nii
+from RegOptim.utils import load_nii, save_nii
+from RegOptim.experiment_configs.utils import import_func
 from RegOptim.preprocessing import change_resolution
-from .derivatives import get_derivative_Lv
+from RegOptim.optimization.derivatives import get_derivative_Lv
 from RegOptim.image_utils import get_contour2D, get_contour3D, padding
 
 from pathlib2 import Path
-import pickle
 import gc
 import json
 
+
+def check_correctness_of_dict(names=None, **kwargs):
+    if names is None:
+        names = ['n_step', 'n_iters', 'resolution', 'smoothing_sigmas', 'delta_phi_threshold',
+                 'unit_threshold', 'learning_rate']
+    if not kwargs.get('reg_params'):
+        for name in names:
+            kwargs['reg_params'].update(name, kwargs[name])
+            del kwargs[name]
+
+        return kwargs
 
 def optim_template_strategy(it, k=10):
     if it % k == 0:
         return True
     else:
         return False
-
 
 def create_exp_folders(exp_path, params=None):
     Path(exp_path).mkdir(exist_ok=True)
@@ -39,12 +49,14 @@ def create_exp_folders(exp_path, params=None):
     path_to_kernels = os.path.join(exp_path, 'kernel/')
     Path(path_to_kernels).mkdir(exist_ok=True)
 
-
 def create_template(path_to_data, train_idx, path_to_template, template_name,
-                    resolution, sigma=0.01, inverse=False):
+                    resolution, sigma=0.01, load_params=None):
     images = []
 
+
     if isinstance(path_to_data[0], (str, np.string_, np.unicode_)):
+        assert load_params is None, "if data given by full path, you should provide loader"
+        load_images = import_func(load_params)
         images = load_images(path_to_data[np.ix_(train_idx)])
 
     if isinstance(path_to_data[0], np.ndarray):
@@ -56,12 +68,8 @@ def create_template(path_to_data, train_idx, path_to_template, template_name,
     images = np.array(images)
     template = np.mean(images, axis=0)
 
-    if inverse:
-        template = change_resolution(template, 1 / float(resolution), sigma, multiple=False)
-
     save_nii(template, os.path.join(path_to_template, template_name))
     return template
-
 
 def update_template(template, template_path, template_name, delta, learning_rate=0.1):
     if isinstance(template, (str, np.string_, np.str, np.unicode_)):
@@ -85,7 +93,6 @@ def update_template(template, template_path, template_name, delta, learning_rate
     else:
         raise TypeError('Unknown type of template')
 
-
 def pad_template_data_after_loop(template, path_to_template, pad_size=2, save=True, ndim=3):
     if isinstance(template, (str, np.str, np.string_, np.unicode_)):
         image = load_nii(template)
@@ -97,12 +104,10 @@ def pad_template_data_after_loop(template, path_to_template, pad_size=2, save=Tr
         save_nii(padded_template, path_to_template)
     return padded_template
 
-
 def binarize(delta):
     bin_delta = delta.copy()
     bin_delta[delta != 0] = 1.
     return bin_delta
-
 
 def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3):
     bin_delta = binarize(delta)
@@ -118,7 +123,6 @@ def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3)
 
     return delta * contour_delta
 
-
 def count_K_to_template(Lvf, vf, n):
     K = np.zeros((n, n))
     # vf  shape (n_samples, t, ndim, img_shape)
@@ -130,14 +134,12 @@ def count_K_to_template(Lvf, vf, n):
 
     return K
 
-
 def count_K_pairwise(metrics, n):
     K = np.zeros((n, n))
     i, j = np.triu_indices(n=n, k=0)
     K[i, j] = metrics
 
     return K + K.T - K.diagonal()
-
 
 def path_length(A, vf, a, b):
     # count
@@ -154,7 +156,6 @@ def path_length(A, vf, a, b):
     db = 0.5 * (db[:-1] + db[1:])
 
     return da, db
-
 
 def count_da_db_pairwise(vf, a, b, shape, n_job, n):
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
@@ -173,7 +174,6 @@ def count_da_db_pairwise(vf, a, b, shape, n_job, n):
     db[i, j] = train_db
 
     return da + da.T - da.diagonal(), db + db.T - db.diagonal()
-
 
 def count_da_db_to_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
     da = np.zeros((n, n))
@@ -199,20 +199,19 @@ def count_da_db_to_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
 
     return da, db
 
-
-def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, mode='path'):
+def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, shape):
     # we want to differentiate K(kernel) by J (template)
     # K_ij = <Lv_i, v_j>
     # dK/dJ = <Ldv_i/dJ, v_j> + <Lv_i, dv_j/dJ>
     # <Ldv_i/dJ, v_j> = <dv_i/dJ, Lv_j>, because L - is self-adjoint
     # dK/dJ = <dv_i/dJ, Lv_j> + <Lv_i, dv_j/dJ>
 
-    if mode == 'path':
-        with open(dv_dJ_i, 'rb') as f:
-            dv_dJ_i = pickle.load(f).astype(np.float32)
-        with open(dv_dJ_j, 'rb') as f:
-            dv_dJ_j = pickle.load(f).astype(np.float32)
-
+    dv_dJ_i = dv_dJ_i.toarray().reshape(shape)
+    dv_dJ_j = dv_dJ_j.toarray().reshape(shape)
+        # with open(dv_dJ_i, 'rb') as f:
+        #     dv_dJ_i = pickle.load(f).astype(np.float32)
+        # with open(dv_dJ_j, 'rb') as f:
+        #     dv_dJ_j = pickle.load(f).astype(np.float32)
     axis = tuple(np.arange(Lvfs_i.ndim))
 
     # np.sum(b[0] * a[..., None, None], axis=(1,2,3,4))

@@ -89,11 +89,10 @@ def diff_loss_by_J(dK_dJ_train, dK_dJ_test, K_train, K_test, y_train, y_test, pr
             (expand_dims(K_train, ndim) * (expand_dims((s1s * beta).T, ndim) * dK_dJ_train).sum(axis=0)[None]).sum(axis=1)
 
     dbeta_dJ = (expand_dims(H, ndim) * dd_dJ).sum(axis=1)
-
+    
     dbeta_dx_dJ = (dK_dJ_test * expand_dims(beta, ndim)).sum(axis=1) + (expand_dims(K_test, ndim)* dbeta_dJ).sum(axis=1)
-
-
-    dxdJ = - np.sum((y_test - proba_test) * dbeta_dx_dJ, axis=0) + (2 * expand_dims(beta.T, ndim) *  dbeta_dJ).sum(axis=0)
+    
+    dxdJ = - np.sum(expand_dims(y_test - proba_test, ndim) * dbeta_dx_dJ, axis=0).sum(axis=0) + (2 * expand_dims(beta.T, ndim) *  dbeta_dJ).sum(axis=(0,1))
 
     return dxdJ
 

@@ -5,12 +5,12 @@ from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
-
 from RegOptim.ml.ml_utils import diff_K_exp_kernel, diff_J_kernel
 from RegOptim.ml.ml_utils import diff_loss_by_a_b, diff_loss_by_J
 from RegOptim.ml.ml_utils import MLE_l2_loss
 
-def count_grads_a_b_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, random_state=0, kernel=False):
+
+def count_grads_a_b_template(exp_K, y, da, db, dJ, params, n_splits=10, ndim=3, random_state=0, kernel=False):
     roc_aucs = []
     grads_a, grads_b = [], []
     grads_J = []
@@ -38,7 +38,7 @@ def count_grads_a_b_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, 
         if kernel:
             da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
                                                   K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
-                                                  K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
+                                                  K_test=exp_test, dK_test=da[np.ix_(idx_test, idx_train)])
 
             db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
                                                   K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
@@ -60,8 +60,6 @@ def count_grads_a_b_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, 
                                              beta=lr.coef_
                                              )
 
-
-
         grad_J = diff_loss_by_J(dK_dJ_train=dJ_train, dK_dJ_test=dJ_test,
                                 K_train=exp_train, K_test=exp_test,
                                 y_train=y_train, y_test=y_test,
@@ -72,10 +70,13 @@ def count_grads_a_b_template(exp_K, da, db, dJ, y, params, n_splits=10, ndim=3, 
         grads_b.append(grad_b)
         grads_J.append(grad_J)
 
+    print "Train score: ", np.mean(roc_aucs)
+    print "Train loss: ", np.mean(losses)
+
     return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs), np.mean(losses)
 
 
-def count_grads_a_b(exp_K, da, db, y, params, n_splits=10, random_state=0, kernel=False):
+def count_grads_a_b(exp_K, y, da, db, params, n_splits=10, random_state=0, kernel=False):
     roc_aucs = []
     grads_a, grads_b = [], []
     losses = []
@@ -95,7 +96,7 @@ def count_grads_a_b(exp_K, da, db, y, params, n_splits=10, random_state=0, kerne
         proba_train = lr.predict_proba(exp_train).T[1]
         log_proba = lr.predict_log_proba(exp_test)
 
-        loss = -np.sum(y_test * log_proba.T[1] + (1-y_test)*log_proba.T[0]) + np.sum(lr.coef_**2)
+        loss = -np.sum(y_test * log_proba.T[1] + (1 - y_test) * log_proba.T[0]) + np.sum(lr.coef_ ** 2)
 
         roc_aucs.append(roc_auc_score(y_test, proba_test))
         losses.append(loss)
@@ -103,7 +104,7 @@ def count_grads_a_b(exp_K, da, db, y, params, n_splits=10, random_state=0, kerne
 
             da_train, da_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
                                                   K_train=exp_train, dK_train=da[np.ix_(idx_train, idx_train)],
-                                                  K_test=exp_test,  dK_test=da[np.ix_(idx_test, idx_train)])
+                                                  K_test=exp_test, dK_test=da[np.ix_(idx_test, idx_train)])
 
             db_train, db_test = diff_K_exp_kernel(alpha=params['kernel__gamma'],
                                                   K_train=exp_train, dK_train=db[np.ix_(idx_train, idx_train)],
@@ -120,15 +121,16 @@ def count_grads_a_b(exp_K, da, db, y, params, n_splits=10, random_state=0, kerne
                                              beta=lr.coef_
                                              )
 
-
         grads_a.append(grad_a)
         grads_b.append(grad_b)
+
+    print "Train score: ", np.mean(roc_aucs)
+    print "Train loss: ", np.mean(losses)
 
     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs), np.mean(losses)
 
 
 def test_score_prediction_scaled(K, y, idx_train, idx_test, params):
-
     K_train, y_train = K[np.ix_(idx_train, idx_train)], y[np.ix_(idx_train)]
     K_test, y_test = K[np.ix_(idx_test, idx_train)], y[np.ix_(idx_test)]
 
@@ -140,14 +142,15 @@ def test_score_prediction_scaled(K, y, idx_train, idx_test, params):
     clf.fit(K_train, y_train)
 
     lr_best_score = roc_auc_score(y_test, clf.predict_proba(K_test).T[1])
+    test_loss = MLE_l2_loss(y_test, clf.predict_log_proba(K_test), clf.coef_)
 
     print "Test scores: ", lr_best_score
+    print "Test loss: ", test_loss
 
-    return lr_best_score, MLE_l2_loss(y_test, clf.predict_log_proba(K_test), clf.coef_)
+    return lr_best_score, test_loss
 
 
 def test_score_prediction(K, y, idx_train, idx_test, params):
-
     K_train, y_train = K[np.ix_(idx_train, idx_train)], y[np.ix_(idx_train)]
     K_test, y_test = K[np.ix_(idx_test, idx_train)], y[np.ix_(idx_test)]
 
@@ -163,8 +166,6 @@ def test_score_prediction(K, y, idx_train, idx_test, params):
     print "Test loss: ", test_loss
 
     return lr_best_score, test_loss
-
-
 
 # def count_grads(K_train, y_train, da_train, db_train, params, dJ=None, scaled=False, kernel=False,
 #                 with_template=False, n_splits=10, ndim=3, random_state=0):
@@ -274,4 +275,3 @@ def test_score_prediction(K, y, idx_train, idx_test, params):
 #
 #     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs), np.mean(hinge_losses)
 #
-

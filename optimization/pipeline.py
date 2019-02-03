@@ -78,7 +78,7 @@ def one_to_one(data1, data2, path_to_dJ, **kwargs):
 
     reg = rtk.LDDMM(regularizer=regularizer, similarity=similarity, n_jobs=1, **kwargs['reg_params'])
 
-    if kwargs['data_type'] == 'path':
+    if kwargs['file_type'] == 'path':
         data1 = load_nii(data1)
 
     if path_to_dJ is None:

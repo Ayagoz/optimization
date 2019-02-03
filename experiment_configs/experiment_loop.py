@@ -12,46 +12,37 @@ import os
 import gc
 
 
-def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, add_padding, pad_size, names=None):
+def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, add_padding, pad_size):
     kwargs = {}
-    if names is None:
-        names = ['n_step', 'n_iters', 'resolutions', 'smoothing_sigmas', 'delta_phi_threshold',
-                 'unit_threshold', 'learning_rate']
 
-    kwargs['data_type'] = params['experiment_data']['file_type']
-    kwargs['exp_path'] = os.path.join(params['path']['path_to_exp'], params['experiment_name'])
+    kwargs['file_type'] = params['load_params']['file_type']
+    kwargs['exp_path'] = os.path.join(params['path_to_exp'], params['experiment_name'])
 
     kwargs['data'] = data
     kwargs['template'] = template
     kwargs['ndim'] = params['ndim']
 
-    kwargs['reg_params'] = {}
-    for name in names:
-        kwargs['reg_params'][name] = params['registration_params'][name]
+    kwargs['n_jobs'] = params['n_jobs']
+
+    kwargs.update(params['pipeline_optimization_params'])
 
     if params.get('test_idx'):
         kwargs['test_idx'] = params['test_idx']
 
-    kwargs['a'], kwargs['b'] = a, b
-    kwargs['ssd_var'] = params['registration_params']['ssd_var']
-    kwargs['optim_template'] = optim_template
-    kwargs['add_padding'] = add_padding
-
-    kwargs['n_jobs'] = params['n_jobs']
     kwargs['train_idx'] = idx_out_train
 
     kwargs['resolution'] = params['resolution']
 
     kwargs['random_state'] = params['random_state']
     kwargs['window'] = params['window']
-    kwargs['pad_size'] = pad_size
-
-    kwargs['change_res'] = params['registration_params']['change_res']
-    kwargs['init_resolution'] = params['registration_params']['init_resolution']
-    kwargs['inverse'] = params['registration_params']['inverse']
-    kwargs['epsilon'] = params['registration_params']['epsilon']
 
     kwargs['pipe_template'] = params['pipe_template']
+
+    # updated params
+    kwargs['a'], kwargs['b'] = a, b
+    kwargs['optim_template'] = optim_template
+    kwargs['add_padding'] = add_padding
+    kwargs['pad_size'] = pad_size
 
     return kwargs
 

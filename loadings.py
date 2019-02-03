@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import os
-import pickle
 
 from tqdm import tqdm
 from RegOptim.utils import load_nii, balanced_fold

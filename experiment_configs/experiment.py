@@ -20,31 +20,22 @@ def metric_learning_to_template(PATH):
     path = pipeline_params['path']
 
     random_state = pipeline_params['random_state']
-    exp_data = pipeline_params['experiment_data']
-    experiment_name = exp_data['data_type'] + '_resolution' + str(pipeline_params['resolution']) + \
-                      '_rs' + str(random_state)
-    experiment_path = os.path.join(path['path_to_exp'], experiment_name)
+    experiment_name = pipeline_params['experiment_name']
+    experiment_path = os.path.join(pipeline_params['path_to_exp'], experiment_name)
     path_to_template = os.path.join(experiment_path, 'templates/')
     template_name = 'template_0.nii'
 
-    load_data = import_func(**pipeline_params['load_func'])
     # create folder and path
     create_exp_folders(experiment_path, params=pipeline_params)
 
     print 'experiment name: ', experiment_name
 
-    load_params = {'path_to_data': path['path_to_data'],
-                   'file_type': pipeline_params['experiment_data']['file_type'],
-                   'target_type': pipeline_params['experiment_data']['target_type']}
-
-    if path.get('path_to_meta'):
-        load_params.update({'path_to_meta':pipeline_params['path']['path_to_meta']})
-        load_params.update({'data_type': pipeline_params['experiment_data']['data_type']})
-
-    data, y = load_data(**load_params)
+    load_data = import_func(**pipeline_params['load_func'])
+    data, y = load_data(**pipeline_params['load_params'])
 
     if pipeline_params['subset'] is not None:
         data, y = get_subset(data, y, pipeline_params['subset'], pipeline_params['random_state'])
+
     print "Data size: ", data.shape, " target mean: ", y.mean()
 
     # create splits for (train+val) and test
@@ -63,13 +54,15 @@ def metric_learning_to_template(PATH):
 
     # check if template needs padding
     if check_for_padding(template):
-        template = pad_template_data_after_loop(template.copy(),
-                                                os.path.join(path_to_template, template_name),
-                                                pad_size=pipeline_params['registration_params']['pad_size'],
-                                                ndim=pipeline_params['ndim'])
+        template = pad_template_data_after_loop(
+            template.copy(),
+            os.path.join(path_to_template, template_name),
+            pad_size=pipeline_params['pipeline_optimization_params']['pad_size'],
+            ndim=pipeline_params['ndim']
+        )
 
-        pipeline_params['registration_params']['add_padding'] = True
-        pad_size = pipeline_params['registration_params']['pad_size']
+        pipeline_params['pipeline_optimization_params']['add_padding'] = True
+        pad_size = pipeline_params['pipeline_optimization_params']['pad_size']
     else:
         pad_size = 0
 

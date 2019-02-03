@@ -39,6 +39,8 @@ def metric_learning_to_template(PATH):
 
     if path.get('path_to_meta'):
         load_params.update({'path_to_meta':pipeline_params['path']['path_to_meta']})
+        load_params.update({'data_type': pipeline_params['experiment_data']['data_type']})
+
     data, y = load_data(**load_params)
 
     if pipeline_params['subset'] is not None:

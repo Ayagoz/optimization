@@ -70,7 +70,7 @@ def load_target(path, idx, target_type):
     return np.array(target)
 
 
-def load_data(path_to_data, file_type, target_type, data_type, path_to_meta=None, balanced=True):
+def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, balanced=True):
     '''
     :param path: path to data, architecture of folder proposed:
                     path - main folder contain subject's folders

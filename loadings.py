@@ -70,7 +70,7 @@ def load_target(path, idx, target_type):
     return np.array(target)
 
 
-def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_type='nii', balanced=True):
+def load_data(path_to_data, file_type, target_type, data_type, path_to_meta=None, balanced=True):
     '''
     :param path: path to data, architecture of folder proposed:
                     path - main folder contain subject's folders
@@ -83,24 +83,12 @@ def load_data(path, data_type=None, target_type=None, path_to_meta=None, file_ty
             if file_type is .pkl the data and target should be specifized by names: data_type and data_type + _target
     :return: data and target
     '''
-
+    assert file_type is not None and path_to_meta is not None, 'provide target path'
     if file_type == 'nii' or file_type == 'path':
-        data, names = load_data_from_nii(path, data_type, file_type)
-        if target_type is None:
-            return data
-        if path_to_meta is not None:
-            target = load_target(path_to_meta, names, target_type)
-            if balanced:
-                idx = balanced_fold(target)
-                return data[np.ix_(idx)], target[np.ix_(idx)]
-            return data, target
-
-    if file_type == 'pkl':
-        with open(os.path.join(path, data_type + '_data.pkl'), 'rb') as f:
-            data = pickle.load(f)
-        with open(os.path.join(path, data_type + '_target.pkl'), 'rb') as f:
-            target = pickle.load(f)
+        data, names = load_data_from_nii(path_to_data, data_type, file_type)
+        target = load_target(path_to_meta, names, target_type)
         if balanced:
             idx = balanced_fold(target)
             return data[np.ix_(idx)], target[np.ix_(idx)]
         return data, target
+

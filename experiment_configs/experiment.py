@@ -32,10 +32,13 @@ def metric_learning_to_template(PATH):
     create_exp_folders(experiment_path, params=pipeline_params)
 
     print 'experiment name: ', experiment_name
+
     load_params = {'path_to_data': path['path_to_data'],
                    'file_type': pipeline_params['experiment_data']['file_type'],
                    'target_type': pipeline_params['experiment_data']['target_type']}
 
+    if path.get('path_to_meta'):
+        load_params.update({'path_to_meta':pipeline_params['path']['path_to_meta']})
     data, y = load_data(**load_params)
 
     if pipeline_params['subset'] is not None:

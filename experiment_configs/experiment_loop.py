@@ -85,8 +85,8 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
                 pipeline_params, template_name, path_to_template, pad_size, it
             )
             if add_padding:
-                pad_size += pipeline_params['registration_params']['pad_size']
-                pipeline_params['registration_params']['add_padding'] = add_padding
+                pad_size += pipeline_params['pipeline_optimization_params']['pad_size']
+                pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
         else:
             best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss = optimize_a_b_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,

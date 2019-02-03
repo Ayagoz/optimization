@@ -18,7 +18,6 @@ def check_for_padding(image):
 
 
 def pad_images(data, pad_size=2, ndim=3):
-
     if isinstance(data[0], (str, np.str, np.string_, np.unicode_)):
         images = np.array([load_nii(subj, None) for subj in data])
     else:
@@ -56,6 +55,13 @@ def padding(image, ndim=2, pad_size=2, mode='constant', c_val=0):
             padded_data = np.pad(image.copy(), tuple(pad), mode=mode)
 
         return padded_data
+
+
+def binarize(delta, t=0):
+    bin_delta = delta.copy()
+    bin_delta[delta > t] = 1.
+    bin_delta[delta <= t] = 0.
+    return bin_delta
 
 
 def get_contour3D(image, axis=0, contour_color=150, width=3, mask=True):
@@ -96,9 +102,17 @@ def get_contour3D(image, axis=0, contour_color=150, width=3, mask=True):
 
 def find_threshold_gray_scale(img):
     bins, x = np.histogram(img.reshape(-1))
-    idx = np.where(bins == 0)[0]
-    idx = idx[len(idx) / 2]
-    return x[idx]
+    try:
+        idx = np.where(bins == 0)[0]
+        idx = idx[len(idx) / 2]
+        return x[idx]
+    except:
+        return x[len(x) // 2 + 1]
+
+
+def get_outside_filled(imgray, mask_contour, t=0.):
+    mask_img = binarize(imgray, find_threshold_gray_scale(imgray))
+    return binarize(np.ones_like(mask_img) - mask_img + mask_contour, t)
 
 
 def get_contour2D(image, contour_color=150, width=3, mask=True):

@@ -73,7 +73,7 @@ def diff_J_kernel(alpha, K_train, dK_train, K_test, dK_test, ndim):
 
 
 def diff_loss_by_J(dK_dJ_train, dK_dJ_test, K_train, K_test, y_train, y_test, proba_test,
-                      proba_train, H, beta, ndim):
+                      proba_train, H, beta, ndim, C):
 
     # loss = -MLE + ||beta||^2
     # d loss /dJ =  - sum ((y_true - proba) * (beta^T * dx/dJ + d beta^T/ dJ * x)) + 2 beta * d beta /dJ
@@ -92,12 +92,12 @@ def diff_loss_by_J(dK_dJ_train, dK_dJ_test, K_train, K_test, y_train, y_test, pr
     
     dbeta_dx_dJ = (dK_dJ_test * expand_dims(beta, ndim)).sum(axis=1) + (expand_dims(K_test, ndim)* dbeta_dJ).sum(axis=1)
     
-    dxdJ = - np.sum(expand_dims(y_test - proba_test, ndim) * dbeta_dx_dJ, axis=0).sum(axis=0) + (2 * expand_dims(beta.T, ndim) *  dbeta_dJ).sum(axis=(0,1))
+    dxdJ = - np.sum(expand_dims(y_test - proba_test, ndim) * dbeta_dx_dJ, axis=0).sum(axis=0) + (2 * C * expand_dims(beta.T, ndim) *  dbeta_dJ).sum(axis=(0,1))
 
     return dxdJ
 
 def diff_loss_by_a_b(dK_da_train, dK_da_test, dK_db_train, dK_db_test, K_test, K_train,
-                                            y_train, y_test, proba_test, proba_train, beta):
+                                            y_train, y_test, proba_test, proba_train, beta, C):
     '''
     for loss(beta) = -MLE + ||beta||^2 minimization
     '''
@@ -131,7 +131,7 @@ def diff_loss_by_a_b(dK_da_train, dK_da_test, dK_db_train, dK_db_test, K_test, K
     dbeta_dx_da = (dK_da_test.dot(beta.T) + K_test.dot(dbeta_da))
     dbeta_dx_db = (dK_db_test.dot(beta.T) + K_test.dot(dbeta_db))
 
-    dxda = - np.sum((y_test - proba_test) * dbeta_dx_da) + 2 * beta.dot(dbeta_da)
-    dxdb = - np.sum((y_test - proba_test) * dbeta_dx_db) + 2 * beta.dot(dbeta_db)
+    dxda = - np.sum((y_test - proba_test) * dbeta_dx_da) + 2 * C * beta.dot(dbeta_da)
+    dxdb = - np.sum((y_test - proba_test) * dbeta_dx_db) + 2 * C * beta.dot(dbeta_db)
 
     return np.sum(dxda), np.sum(dxdb), H

@@ -1,4 +1,4 @@
-from RegOptim.experiment_configs.utils import import_func
+from RegOptim.utils import import_func
 from RegOptim.optimization.pipeline import count_dist_matrix_to_template
 from RegOptim.ml.ml_utils import find_pipeline_params, adam_step
 from RegOptim.optimization.pipeline_utils import update_template, preprocess_delta_template, \
@@ -10,6 +10,50 @@ import numpy as np
 import time
 import os
 import gc
+
+
+def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, add_padding, pad_size, names=None):
+    kwargs = {}
+    if names is None:
+        names = ['n_step', 'n_iters', 'resolutions', 'smoothing_sigmas', 'delta_phi_threshold',
+                 'unit_threshold', 'learning_rate']
+
+    kwargs['data_type'] = params['experiment_data']['file_type']
+    kwargs['exp_path'] = os.path.join(params['path']['path_to_exp'], params['experiment_name'])
+
+    kwargs['data'] = data
+    kwargs['template'] = template
+    kwargs['ndim'] = params['ndim']
+
+    kwargs['reg_params'] = {}
+    for name in names:
+        kwargs['reg_params'][name] = params['registration_params'][name]
+
+    if params.get('test_idx'):
+        kwargs['test_idx'] = params['test_idx']
+
+    kwargs['a'], kwargs['b'] = a, b
+    kwargs['ssd_var'] = params['registration_params']['ssd_var']
+    kwargs['optim_template'] = optim_template
+    kwargs['add_padding'] = add_padding
+
+    kwargs['n_jobs'] = params['n_jobs']
+    kwargs['train_idx'] = idx_out_train
+
+    kwargs['resolution'] = params['resolution']
+
+    kwargs['random_state'] = params['random_state']
+    kwargs['window'] = params['window']
+    kwargs['pad_size'] = pad_size
+
+    kwargs['change_res'] = params['registration_params']['change_res']
+    kwargs['init_resolution'] = params['registration_params']['init_resolution']
+    kwargs['inverse'] = params['registration_params']['inverse']
+    kwargs['epsilon'] = params['registration_params']['epsilon']
+
+    kwargs['pipe_template'] = params['pipe_template']
+
+    return kwargs
 
 
 def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
@@ -47,7 +91,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
         if optim_template:
             template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding = optimize_template_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
-                pipeline_params, experiment_path, template_name, path_to_template, pad_size, it
+                pipeline_params, template_name, path_to_template, pad_size, it
             )
             if add_padding:
                 pad_size += pipeline_params['registration_params']['pad_size']
@@ -55,7 +99,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
         else:
             best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss = optimize_a_b_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
-                pipeline_params, experiment_path, pad_size
+                pipeline_params, pad_size
             )
 
         adam_grad_da, mta, vta = adam_step(grads_da, mta, vta, it)
@@ -86,27 +130,19 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 
 
 def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
-                           pipeline_params, experiment_path, template_name, path_to_template,
+                           pipeline_params, template_name, path_to_template,
                            pad_size, it):
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_template = import_func(**pipeline_params['count_grads_template'])
 
     template_updates = pipeline_params['template_updates']
     reg = pipeline_params['registration_params']
-    
+
     add_padding = reg['add_padding']
     y_out_train = y[idx_out_train]
 
-    K, da, db, dJ = count_dist_matrix_to_template(
-        data, template, a, b, idx_out_train, epsilon=reg['epsilon'],
-        n_job=reg['n_jobs'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
-        resolutions=reg['resolutions'], smoothing_sigmas=reg['smoothing_sigmas'],
-        delta_phi_threshold=reg['delta_phi_threshold'], unit_threshold=reg['unit_threshold'],
-        learning_rate=reg['learning_rate'], change_res=reg['change_res'],
-        init_resolution=pipeline_params['resolution'], exp_path=experiment_path,
-        data_type='path', vf0=reg['vf0'], inverse=reg['inverse'], optim_template=True,
-        add_padding=reg['add_padding'], pad_size=pad_size, window=pipeline_params['window']
-    )
+    kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
+    K, da, db, dJ = count_dist_matrix_to_template(**kwargs)
 
     K_out_train = K[np.ix_(idx_out_train, idx_out_train)]
 
@@ -141,30 +177,21 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
                                                 pad_size=reg['pad_size'], ndim=pipeline_params['ndim'])
 
         add_padding = True
-        
+
     gc.collect()
 
-    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding 
+    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding
 
 
 def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
-                      pipeline_params, experiment_path, pad_size):
+                      pipeline_params, pad_size):
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_a_b = import_func(**pipeline_params['count_grads_a_b'])
 
-    reg = pipeline_params['registration_params']
     y_out_train = y[idx_out_train]
-
-    K, da, db = count_dist_matrix_to_template(
-        data, template, a, b, idx_out_train, epsilon=reg['epsilon'],
-        n_job=reg['n_jobs'], ssd_var=reg['ssd_var'], n_steps=reg['n_steps'], n_iters=reg['n_iters'],
-        resolutions=reg['resolutions'], smoothing_sigmas=reg['smoothing_sigmas'],
-        delta_phi_threshold=reg['delta_phi_threshold'], unit_threshold=reg['unit_threshold'],
-        learning_rate=reg['learning_rate'], change_res=reg['change_res'],
-        init_resolution=pipeline_params['resolution'], exp_path=experiment_path,
-        data_type='path', vf0=reg['vf0'], inverse=reg['inverse'], optim_template=False,
-        add_padding=reg['add_padding'], pad_size=pad_size, window=pipeline_params['window']
-    )
+    kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, False,
+                           pipeline_params['registration_params']['add_padding'], pad_size)
+    K, da, db = count_dist_matrix_to_template(**kwargs)
 
     K_out_train = K[np.ix_(idx_out_train, idx_out_train)]
 

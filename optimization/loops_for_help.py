@@ -57,14 +57,14 @@ def count_grads_a_b_template(exp_K, y, da, db, dJ, params, n_splits=10, ndim=3, 
                                              K_train=exp_train, K_test=exp_test,
                                              y_train=y_train, y_test=y_test,
                                              proba_train=proba_train, proba_test=proba_test,
-                                             beta=lr.coef_
+                                             beta=lr.coef_, C=params['ml__C']
                                              )
 
         grad_J = diff_loss_by_J(dK_dJ_train=dJ_train, dK_dJ_test=dJ_test,
                                 K_train=exp_train, K_test=exp_test,
                                 y_train=y_train, y_test=y_test,
                                 proba_train=proba_train, proba_test=proba_test,
-                                H=H, beta=lr.coef_, ndim=ndim)
+                                H=H, beta=lr.coef_, ndim=ndim, C=params['ml__C'])
 
         grads_a.append(grad_a)
         grads_b.append(grad_b)
@@ -118,7 +118,7 @@ def count_grads_a_b(exp_K, y, da, db, params, n_splits=10, random_state=0, kerne
                                              K_train=exp_train, K_test=exp_test,
                                              y_train=y_train, y_test=y_test,
                                              proba_train=proba_train, proba_test=proba_test,
-                                             beta=lr.coef_
+                                             beta=lr.coef_, C=params['ml__C']
                                              )
 
         grads_a.append(grad_a)

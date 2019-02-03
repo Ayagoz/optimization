@@ -7,16 +7,16 @@ from tqdm import tqdm
 from RegOptim.utils import load_nii, balanced_fold
 
 
-def load_data_from_one_dir(global_path, file_type, target_type):
+def load_data_from_one_dir(path_to_data, file_type, target_type):
     data, target = [], []
-    subj = os.listdir(global_path)
+    subj = os.listdir(path_to_data)
 
     for subj in tqdm(subj, desc='loading subjects'):
         for k, i in target_type.items():
             if k in subj:
                 target += [i]
 
-        path_to_subj = os.path.join(global_path, subj)
+        path_to_subj = os.path.join(path_to_data, subj)
         if file_type == 'nii':
             data += [load_nii(path_to_subj, file_type)]
         if file_type == 'path':
@@ -25,13 +25,13 @@ def load_data_from_one_dir(global_path, file_type, target_type):
     return np.array(data), np.array(target)
 
 
-def load_data_from_dirs(global_path, data_type, file_type):
+def load_data_from_dirs(path_to_data, data_type, file_type):
     data = []
     subj_names = []
-    path = os.listdir(global_path)
+    path = os.listdir(path_to_data)
 
     for subj in tqdm(path, desc='loading subjects'):
-        path_to_subj = os.path.join(os.path.join(global_path, subj), 'nii')
+        path_to_subj = os.path.join(os.path.join(path_to_data, subj), 'nii')
 
         image = load_nii(path_to_subj, data_type)
         if image.sum() != 0:

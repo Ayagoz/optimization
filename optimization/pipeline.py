@@ -9,84 +9,83 @@ import ntpath
 # from memory_profiler import profile
 from joblib import Parallel, delayed
 
-from RegOptim.optimization.derivatives import to_one_resolution, get_derivative_Lv, get_derivative_v, \
-    get_derivative_template, derivatives_of_pipeline_with_template, \
-    derivatives_of_pipeline_without_template
 from RegOptim.utils import load_nii
 from RegOptim.preprocessing import change_resolution
 from RegOptim.image_utils import padding
-from RegOptim.optimization.pipeline_utils import count_K_pairwise, count_da_db_pairwise, check_correctness_of_dict
+from RegOptim.optimization.pipeline_utils import get_shape
+from RegOptim.optimization.metrics import count_K_pairwise, count_da_db_pairwise, count_dJ,\
+    count_K_to_template, count_da_db_to_template
+from RegOptim.optimization.derivatives import template_pipeline_derivatives, pairwise_pipeline_derivatives
 
 joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 
 
-# @profile
-def pairwise_pipeline_derivatives(reg, inverse):
-    in_one_res = to_one_resolution(reg.resulting_vector_fields, reg.resolutions, reg.n_step,
-                                   reg.zoom_grid, False, inverse)
 
-    return np.sum(reg.resulting_metric) / len(reg.resolutions), in_one_res
-
-
-# @profile
-def template_pipeline_derivatives(reg, similarity, regularizer, data, template, a, b,
-                                  epsilon, shape, inverse, optim_template, path,
-                                  n_jobs, window):
-    in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
-                                   resolutions=reg.resolutions,
-                                   n_steps=reg.n_step, zoom_grid=reg.zoom_grid, vf0=True, inverse=inverse)
-
-    vf_all_in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
-                                          resolutions=reg.resolutions,
-                                          n_steps=reg.n_step, zoom_grid=reg.zoom_grid,
-                                          vf0=False, inverse=inverse)
-
-    regularizer.set_operator(shape)
-
-    # find Lv(t=1,ndim, img_shape)
-    Lvf = regularizer(in_one_res[0])[None]
-    # get derivatives of Lv
-    Deltas_v = get_derivative_Lv(A=reg.As[-1], v=in_one_res, a=a, b=b)
-    dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
-    del Deltas_v
-
-    # after that will be change reg so, save everything what you need
-    dv_da, dv_db = get_derivative_v(a=a, b=b, reg=copy.deepcopy(reg),
-                                    epsilon=epsilon, inverse=inverse, data=data,
-                                    template=template)
-
-    if optim_template:
-        dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
-                                        vf_all_in_one_resolution=vf_all_in_one_res,
-                                        similarity=similarity, regularizer=regularizer,
-                                        inverse=inverse, path=path, n_jobs=n_jobs, window=window)
-        gc.collect()
-        return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
-
+def derivatives_of_pipeline_without_template(result, n_total):
+    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db = map(np.concatenate, zip(*result))
+    K = count_K_to_template(Lvfs, vfs, n_total)
+    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
     gc.collect()
-    return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
+    return K, da, db
+
+def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape):
+    n_train = len(train_idx)
+    Lvfs, vfs, dv_da,dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
+    shape = np.array(Lvfs).shape[2:]
+    ndim = len(shape)
+
+    # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
+
+    shape_res = (ndim,) + img_shape + img_shape
+
+    metric = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1].copy(), dv_dJ[idx2].copy(), ndim, shape=shape_res)
+                       for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
+                       for idx2 in train_idx[i:]])
+    dJ = np.zeros((n_train, n_train) + shape)
+
+    i, j = np.triu_indices(n_train, 0)
+    k, l = np.tril_indices(n_train, 0)
+    dJ[i, j] = metric
+    dJ[k, l] = metric
+
+    K = count_K_to_template(Lvfs, vfs, n_total)
+    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
+    gc.collect()
+    return K, da, db, dJ
 
 
-# @profile
+# def check_correctness_of_dict(names=None, **kwargs):
+#     if names is None:
+#         names = ['n_step', 'n_iters', 'resolutions', 'smoothing_sigmas', 'delta_phi_threshold',
+#                  'unit_threshold', 'learning_rate']
+# 
+#     if not kwargs.get('reg_params'):
+#         kwargs['reg_params'] = {}
+#         for name in names:
+#             kwargs['reg_params'].update(name, kwargs[name])
+#             del kwargs[name]
+# 
+#         return kwargs
+
+
 def one_to_one(data1, data2, path_to_dJ, **kwargs):
-    kwargs = check_correctness_of_dict(kwargs)
 
-    reg_params = kwargs['reg_params']
+
     a, b = kwargs['a'], kwargs['b']
     # registration
     similarity = rtk.SSD(variance=kwargs['ssd_var'])
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
 
-    reg = rtk.LDDMM(regularizer=regularizer, similarity=similarity, n_jobs=1, **reg_params)
+    reg = rtk.LDDMM(regularizer=regularizer, similarity=similarity, n_jobs=1, **kwargs['reg_params'])
 
     if kwargs['data_type'] == 'path':
         data1 = load_nii(data1)
 
-    if kwargs['path_to_dJ'] is None:
-        raise TypeError('Variable `path` should be initialized.')
+    if path_to_dJ is None:
+        raise TypeError('Variable `path to derivatives dJ` should be initialized.')
 
-    if isinstance(kwargs['data2'], (str, np.str, np.string_, np.unicode_)):
-        data2 = load_nii(kwargs['data2'])
+    if isinstance(data2, (str, np.str, np.string_, np.unicode_)):
+        data2 = load_nii(data2)
 
     if kwargs['change_res']:
         data1 = np.squeeze(change_resolution(data1, kwargs['init_resolution'], multiple=False))
@@ -158,9 +157,12 @@ def count_dist_matrix_to_template(**kwargs):
         for i in tqdm(range(n), desc="registration")
     )
 
+    if not kwargs.get('shape'):
+        kwargs['shape'] = get_shape(kwargs['template'])
+
     if kwargs['optim_template']:
         gc.collect()
-        return derivatives_of_pipeline_with_template(result=result, train_idx=kwargs.get('train_idx'), n_total=n,
+        return derivatives_of_pipeline_with_template(result=result, train_idx=kwargs['train_idx'], n_total=n,
                                                      img_shape=kwargs['shape']
                                                      )
 
@@ -201,7 +203,7 @@ def count_dist_matrix(**kwargs):
     if n_test != 0:
         test_result = Parallel(n_jobs=n_jobs, temp_folder=joblib_folder)(
             delayed(one_to_one)(
-                data1=copy.deepcopy(data[idx1]), data2=copy.deepcopy(data[idx2]),**kwargs)
+                data1=copy.deepcopy(data[idx1]), data2=copy.deepcopy(data[idx2]), **kwargs)
             for idx1 in tqdm(idx_test, desc='test') for idx2 in idx_train
         )
 

@@ -3,14 +3,12 @@ from rtk.registration.LDDMM import derivative
 from rtk import gradient
 
 import numpy as np
+import copy
+#import gc
 from scipy.fftpack import fftn, ifftn
 
 from RegOptim.preprocessing import to_one_resolution
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v
-from RegOptim.optimization.pipeline_utils import count_da_db_to_template, count_K_to_template, count_dJ
-
-from tqdm import tqdm
-import gc
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
@@ -100,41 +98,53 @@ def get_derivative_v(a, b, reg, epsilon=0.1, inverse=True, data=None, template=N
     return dv_da, dv_db
 
 
-def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape):
-    n_train = len(train_idx)
-    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
-    shape = np.array(Lvfs).shape[2:]
-    ndim = len(shape)
+def pairwise_pipeline_derivatives(reg, inverse):
+    in_one_res = to_one_resolution(reg.resulting_vector_fields, reg.resolutions, reg.n_step,
+                                   reg.zoom_grid, False, inverse)
 
-    # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
-    if isinstance(dv_dJ[0], (str, np.str, np.string_, np.unicode_)):
-        shape_res = (ndim,) + img_shape + img_shape
-    else:
-        shape_res = (1, ndim) + img_shape + img_shape
-
-    metric = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1].copy(), dv_dJ[idx2].copy(), ndim, shape=shape_res)
-                       for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
-                       for idx2 in train_idx[i:]])
-    dJ = np.zeros((n_train, n_train) + shape)
-
-    i, j = np.triu_indices(n_train, 0)
-    k, l = np.tril_indices(n_train, 0)
-    dJ[i, j] = metric
-    dJ[k, l] = metric
-
-    K = count_K_to_template(Lvfs, vfs, n_total)
-    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-    gc.collect()
-    return K, da, db, dJ
+    return np.sum(reg.resulting_metric) / len(reg.resolutions), in_one_res
 
 
 # @profile
-def derivatives_of_pipeline_without_template(result, n_total):
-    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db = map(np.concatenate, zip(*result))
-    K = count_K_to_template(Lvfs, vfs, n_total)
-    da, db = count_da_db_to_template(Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, n_total)
-    gc.collect()
-    return K, da, db
+def template_pipeline_derivatives(reg, similarity, regularizer, data, template, a, b,
+                                  epsilon, shape, inverse, optim_template, path,
+                                  n_jobs, window):
+    in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
+                                   resolutions=reg.resolutions,
+                                   n_steps=reg.n_step, zoom_grid=reg.zoom_grid, vf0=True, inverse=inverse)
+
+    vf_all_in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
+                                          resolutions=reg.resolutions,
+                                          n_steps=reg.n_step, zoom_grid=reg.zoom_grid,
+                                          vf0=False, inverse=inverse)
+
+    regularizer.set_operator(shape)
+
+    # find Lv(t=1,ndim, img_shape)
+    Lvf = regularizer(in_one_res[0])[None]
+    # get derivatives of Lv
+    Deltas_v = get_derivative_Lv(A=reg.As[-1], v=in_one_res, a=a, b=b)
+    dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
+    del Deltas_v
+
+    # after that will be change reg so, save everything what you need
+    dv_da, dv_db = get_derivative_v(a=a, b=b, reg=copy.deepcopy(reg),
+                                    epsilon=epsilon, inverse=inverse, data=data,
+                                    template=template)
+
+    if optim_template:
+        dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
+                                        vf_all_in_one_resolution=vf_all_in_one_res,
+                                        similarity=similarity, regularizer=regularizer,
+                                        inverse=inverse, path=path, n_jobs=n_jobs, window=window)
+        #gc.collect()
+        return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
+
+    #gc.collect()
+
+    return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
+
+
 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
@@ -189,6 +199,6 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
     del moving_imgs, template_imgs
     del dl_dv, inv_grad_v, dl_dJ_dv
 
-    gc.collect()
+    #gc.collect()
 
-    return dv_dJ
+    return [dv_dJ]

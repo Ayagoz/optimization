@@ -17,7 +17,6 @@ def metric_learning_to_template(PATH):
     print "START EXPERIMENT"
     pipeline_params = json.load(open(PATH, 'r'))
     # extract params to shorter usage
-    path = pipeline_params['path']
 
     random_state = pipeline_params['random_state']
     experiment_name = pipeline_params['experiment_name']

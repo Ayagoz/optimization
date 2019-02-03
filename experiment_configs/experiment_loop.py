@@ -55,8 +55,8 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
     lr_params = pipeline_params['lr_change_params'][pipeline_params['lr_type']['func']]
     lr = lr_params['init_lr']
     it = 1
-    a_it = [0., pipeline_params['a_b'][0]]
-    b_it = [0., pipeline_params['a_b'][1]]
+    a_it = [0., pipeline_params['pipeline_optimization_params']['a']]
+    b_it = [0., pipeline_params['pipeline_optimization_params']['b']]
 
     mta, vta = 0., 0.
     mtb, vtb = 0., 0.

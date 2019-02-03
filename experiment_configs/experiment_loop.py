@@ -127,7 +127,7 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
     count_grads_template = import_func(**pipeline_params['count_grads_template'])
 
     template_updates = pipeline_params['template_updates']
-    reg = pipeline_params['registration_params']
+    reg = pipeline_params['pipeline_optimization_params']
 
     add_padding = reg['add_padding']
     y_out_train = y[idx_out_train]
@@ -178,10 +178,11 @@ def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
                       pipeline_params, pad_size):
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_a_b = import_func(**pipeline_params['count_grads_a_b'])
+    reg = pipeline_params['pipeline_optimization_params']
 
     y_out_train = y[idx_out_train]
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, False,
-                           pipeline_params['registration_params']['add_padding'], pad_size)
+                           reg['add_padding'], pad_size)
     K, da, db = count_dist_matrix_to_template(**kwargs)
 
     K_out_train = K[np.ix_(idx_out_train, idx_out_train)]

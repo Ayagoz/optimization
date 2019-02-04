@@ -14,8 +14,10 @@ def hinge_loss_coef(y_pred, y_true):
         y_copy = np.copy(y_true)
     return np.where(y_pred * y_copy < 1, -y_copy, 0)
 
+
 def MLE_l2_loss(y, log_proba, beta):
-    return -np.sum(y * log_proba.T[1] + (1-y)*log_proba.T[0]) + np.sum(beta**2)
+    return -np.sum(y * log_proba.T[1] + (1 - y) * log_proba.T[0]) + np.sum(beta ** 2)
+
 
 def find_pipeline_params(X, y, params, n_jobs=5, random_state=0, scaled=False, kernel=False, scoring='roc_auc',
                          n_splits=100):
@@ -68,13 +70,11 @@ def diff_K_scaled(dK_train, dK_test):
 
 def diff_J_kernel(alpha, K_train, dK_train, K_test, dK_test, ndim):
     return -alpha * expand_dims(K_train, ndim) * dK_train, \
-                       -alpha * expand_dims(K_test, ndim) * dK_test
-
+           -alpha * expand_dims(K_test, ndim) * dK_test
 
 
 def diff_loss_by_J(dK_dJ_train, dK_dJ_test, K_train, K_test, y_train, y_test, proba_test,
-                      proba_train, H, beta, ndim, C):
-
+                   proba_train, H, beta, ndim, C):
     # loss = -MLE + ||beta||^2
     # d loss /dJ =  - sum ((y_true - proba) * (beta^T * dx/dJ + d beta^T/ dJ * x)) + 2 beta * d beta /dJ
     # dx / dJ = dK_dJ
@@ -85,23 +85,27 @@ def diff_loss_by_J(dK_dJ_train, dK_dJ_test, K_train, K_test, y_train, y_test, pr
     p_t = (proba_train - y_train)[None]
     s1s = proba_train * (1 - proba_train)
 
-    dd_dJ = (dK_dJ_train * expand_dims(p_t, ndim)).sum(axis=0)+ \
-            (expand_dims(K_train, ndim) * (expand_dims((s1s * beta).T, ndim) * dK_dJ_train).sum(axis=0)[None]).sum(axis=1)
+    dd_dJ = (dK_dJ_train * expand_dims(p_t, ndim)).sum(axis=1) + \
+            (expand_dims(K_train, ndim) * (expand_dims((s1s * beta).T, ndim) * dK_dJ_train).sum(axis=0)[None]).sum(
+                axis=1)
 
-    dbeta_dJ = (expand_dims(H, ndim) * dd_dJ).sum(axis=1)
-    
-    dbeta_dx_dJ = (dK_dJ_test * expand_dims(beta, ndim)).sum(axis=1) + (expand_dims(K_test, ndim)* dbeta_dJ).sum(axis=1)
-    
-    dxdJ = - np.sum(expand_dims(y_test - proba_test, ndim) * dbeta_dx_dJ, axis=0).sum(axis=0) + (2 * C * expand_dims(beta.T, ndim) *  dbeta_dJ).sum(axis=(0,1))
+    dbeta_dJ = (expand_dims(H.T, ndim) * dd_dJ).sum(axis=0)
+
+    dbeta_dx_dJ = (dK_dJ_test * expand_dims(beta, ndim)).sum(axis=1) + (expand_dims(K_test, ndim) * dbeta_dJ).sum(
+        axis=1)
+
+    dxdJ = - np.sum(expand_dims(y_test - proba_test, ndim) * dbeta_dx_dJ, axis=(0, 1)) + \
+           (2 * (1. / C) * expand_dims(beta.T, ndim) * dbeta_dJ).sum(axis=(0, 1))
 
     return dxdJ
 
+
 def diff_loss_by_a_b(dK_da_train, dK_da_test, dK_db_train, dK_db_test, K_test, K_train,
-                                            y_train, y_test, proba_test, proba_train, beta, C):
+                     y_train, y_test, proba_test, proba_train, beta, C):
     '''
     for loss(beta) = -MLE + ||beta||^2 minimization
     '''
-    #d beta/ da = (d^2 loss/d beta^2)^(-1) (d^2 loss/ d beta /d a)
+    # d beta/ da = (d^2 loss/d beta^2)^(-1) (d^2 loss/ d beta /d a)
 
     # sigma *(1-sigma)
     s1s = (1 - proba_train) * proba_train
@@ -120,18 +124,18 @@ def diff_loss_by_a_b(dK_da_train, dK_da_test, dK_db_train, dK_db_test, K_test, K
     dd_da = dK_da_train.dot(p_t.T) + K_train.dot((beta * s1s).dot(dK_da_train).T)
     dd_db = dK_db_train.dot(p_t.T) + K_train.dot((beta * s1s).dot(dK_db_train).T)
 
-    #d beta / da = H * dd_da
+    # d beta / da = H * dd_da
     dbeta_da = - H.dot(dd_da)
     dbeta_db = - H.dot(dd_db)
 
     # dbeta/da = d argmin(MLE + l2(beta))/ da = (d^2(MLE + l2(beta))/dbeta^2)^(-1).(d(MLE + l2(beta))^2/da/dbeta)
     # H = (d^2(MLE + l2(beta))/dbeta^2)^(-1), DD_da = (d(MLE + l2(beta))^2/da/dbeta)
 
-    #d loss / da = - sum ((y_true - proba) * (beta^T * dx/da + d beta^T/ da * x)) + 2 beta * d beta /da
+    # d loss / da = - sum ((y_true - proba) * (beta^T * dx/da + d beta^T/ da * x)) + 2 beta * d beta /da
     dbeta_dx_da = (dK_da_test.dot(beta.T) + K_test.dot(dbeta_da))
     dbeta_dx_db = (dK_db_test.dot(beta.T) + K_test.dot(dbeta_db))
 
-    dxda = - np.sum((y_test - proba_test) * dbeta_dx_da) + 2 * C * beta.dot(dbeta_da)
-    dxdb = - np.sum((y_test - proba_test) * dbeta_dx_db) + 2 * C * beta.dot(dbeta_db)
+    dxda = - np.sum((y_test - proba_test) * dbeta_dx_da) + 2 * (1. / C) * beta.dot(dbeta_da)
+    dxdb = - np.sum((y_test - proba_test) * dbeta_dx_db) + 2 * (1. / C) * beta.dot(dbeta_db)
 
     return np.sum(dxda), np.sum(dxdb), H

@@ -1,5 +1,4 @@
 import rtk
-from rtk.registration.LDDMM import derivative
 from rtk import gradient
 
 import numpy as np
@@ -8,7 +7,7 @@ import copy
 from scipy.fftpack import fftn, ifftn
 
 from RegOptim.preprocessing import to_one_resolution
-from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v
+from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, full_derivative_by_v
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
@@ -149,36 +148,16 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
                             similarity, regularizer, inverse, path, n_jobs=5, window=3):
-    if inverse:
-        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
-        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=data), n_steps)
-    else:
-        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
-        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
 
-    deformation = rtk.DiffeomorphicDeformation(n_steps)
-    deformation.set_shape(template.shape)
+    grad_v, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
+                                         similarity, regularizer, inverse)
 
-    v = 0.5 * (vf_all_in_one_resolution[:-1] + vf_all_in_one_resolution[1:])
-    deformation.update_mappings(v)
-
-    moving_imgs.apply_transforms(deformation.forward_mappings)
-    template_imgs.apply_transforms(deformation.backward_mappings)
-
-    if inverse:
-        T = -1
-    else:
-        T = 0
-
-    inv_grad_v = np.array([1 / derivative(similarity=similarity, fixed=template_imgs[- T - 1],
-                                          moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
-                                          vector_field=vf_all_in_one_resolution[T],
-                                          regularizer=regularizer, learning_rate=1.)]).reshape(-1, 1)
 
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape
 
-    dl_dv = - 2. / similarity.variance * gradient(moving_imgs[T]) * deformation.backward_dets[- T - 1]
+    dl_dv = - 2. / similarity.variance * gradient(moving_img) * det
+
     #     dl_dv = - similarity.derivative(moving_imgs.data[-1], template_img.data) * deformation.backward_dets[-1] #/ \
     # np.array(moving_imgs[-1] - template_img.data).astype(np.float)
     # if you want to use sparsity
@@ -196,8 +175,8 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
     dv_dJ = sparse_dot_product(vector=inv_grad_v, mat_shape=shape_res[:-template.ndim], window=window,
                                mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
 
-    del moving_imgs, template_imgs
-    del dl_dv, inv_grad_v, dl_dJ_dv
+
+    del dl_dv, dl_dJ_dv
 
     #gc.collect()
 

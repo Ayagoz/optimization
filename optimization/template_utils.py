@@ -4,7 +4,11 @@ from scipy.sparse import coo_matrix
 from joblib import Parallel, delayed
 import gc
 
-joblib_path='~/JOBLIB_TMP_FOLDER/'
+import rtk
+from rtk.registration.LDDMM import derivative
+
+joblib_path = '~/JOBLIB_TMP_FOLDER/'
+
 
 def matrix_to_vec_indices(indices, shape):
     dot = np.array([np.prod(shape[::-1][:-i]) for i in range(1, len(shape))] + [1])
@@ -58,56 +62,111 @@ def neighbours_indices(shape, I, mode='vec', window=3):
         raise TypeError('Not correct mode, support just `vec` and `mat`')
 
 
-def one_line_sparse(vector, I, shape, window):
-    rows = neighbours_indices(shape, I, 'vec', window)
-    cols = np.repeat(I, len(rows))
+def deformation_grad(vf, n_steps, shape):
+    deformation = rtk.DiffeomorphicDeformation(n_steps)
+    deformation.set_shape(shape)
+
+    v = 0.5 * (vf[:-1] + vf[1:])
+    deformation.update_mappings(v)
+
+    return deformation
+
+
+def deformation_applied(moving, template, n_steps, deformation, inverse):
+    if inverse:
+        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
+        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=moving), n_steps)
+    else:
+        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=moving), n_steps)
+        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
+
+    moving_imgs.apply_transforms(deformation.forward_mappings)
+    template_imgs.apply_transforms(deformation.backward_mappings)
+
+    return moving_imgs, template_imgs
+
+
+def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse):
+    deformation = deformation_grad(vf, n_steps, template.shape)
+
+    moving_imgs, template_imgs = deformation_applied(moving, template, n_steps, deformation, inverse)
+
+    if inverse:
+        T = -1
+    else:
+        T = 0
+
+    grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
+                                  moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
+                                  vector_field=vf[T],
+                                  regularizer=regularizer, learning_rate=1.)])
+
+    return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
+
+
+def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
+    # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, x+e))/ (4*e^2) with precision O(h^2)
+
+    # moving_imgs, template_imgs =
+
+    pass
+
+
+def one_line_sparse(vector, ndim, I, shape, window, ax):
+    cols = neighbours_indices(shape, I, 'vec', window)
+    rows = np.repeat(I, len(cols))
 
     data = vector[I] * vector[rows, 0]
 
-    return data, rows, cols
+    mat_shape = (ndim * len(vector), ndim * len(vector))
+    return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 
-def sparse_dot_product_forward(vector, mat_shape, window):
-    data = []
-    rows, cols = [], []
-    for I in range(len(vector)):
-        d, r, c = one_line_sparse(vector, I, mat_shape, window)
+def sparse_dot_product_forward(vector, ndim, mat_shape, window):
+    mat_len = int(np.prod(mat_shape))
 
-        data = np.concatenate([data, d])
-        rows = np.concatenate([rows, r])
-        cols = np.concatenate([cols, c])
+    assert ndim * mat_len == np.prod(vector.shape), "not correct shape of vector"
 
-    rows = rows.astype(int)
-    cols = cols.astype(int)
+    result = coo_matrix((len(vector), len(vector)))
 
-    gc.collect()
-
-    return coo_matrix((data, (cols, rows)), shape=(len(vector), len(vector)))
-
-
-def sparse_dot_product_parallel(vector, mat_shape, window, n_jobs=5, path_joblib='~/JOBLIB_TMP_FOLDER/'):
-    result = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(delayed(one_line_sparse)(vector, I,
-                                                                                       mat_shape,
-                                                                                       window)
-                                                                                       for I in range(len(vector)))
-
-    data, rows, cols = map(np.concatenate, zip(*result))
-
-    rows = rows.astype(int)
-    cols = cols.astype(int)
+    for ax in range(ndim):
+        for I in range(mat_len):
+            loc_res = one_line_sparse(vector[ax * mat_len:(ax + 1) * mat_len], ndim, I, mat_shape, window, ax)
+            result += loc_res
 
     gc.collect()
 
-    return coo_matrix((data, (cols, rows)), shape=(len(vector), len(vector)))
+    return result
 
 
-def sparse_dot_product(vector, mat_shape, window=2, mode='parallel', n_jobs=5, path=joblib_path):
+def sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs=5, path_joblib='~/JOBLIB_TMP_FOLDER/'):
+    mat_len = int(np.prod(mat_shape))
+
+    loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
+        delayed(one_line_sparse)(
+            vector[ax * mat_len: (ax + 1) * mat_len],
+            ndim, I, mat_shape, window, ax
+        )
+        for I in range(mat_len) for ax in range(ndim)
+    )
+
+    gc.collect()
+
+    result = coo_matrix((len(vector), len(vector)))
+    for one in loc_res:
+        result += one
+
+    return result
+
+
+def sparse_dot_product(vector, ndim, mat_shape, window=2, mode='parallel', n_jobs=5, path=joblib_path):
     if mode == 'forward':
-        return sparse_dot_product_forward(vector, mat_shape, window)
+        return sparse_dot_product_forward(vector, ndim, mat_shape, window)
     elif mode == 'parallel':
-        return sparse_dot_product_parallel(vector, mat_shape, window, n_jobs, path)
+        return sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs, path)
     else:
         raise TypeError('Do not support such type of calculating')
+
 
 def double_dev_J_v(vec):
     shape = int(np.prod(vec.shape[1:]))

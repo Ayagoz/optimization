@@ -81,7 +81,6 @@ def deformation_applied(moving, template, n_steps, deformation, inverse):
         moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps)
 
     moving_imgs.apply_transforms(deformation.forward_mappings)
-    template_imgs.apply_transforms(deformation.backward_mappings)
 
     return moving_imgs, template_imgs
 
@@ -185,20 +184,20 @@ def one_line_sparse(vector, ndim, I, shape, window, ax):
     rows = np.repeat(I, len(cols))
     data = vector[I] * vector[rows, 0]
 
-    mat_shape = (ndim * len(vector), ndim * len(vector))
+    mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 
 def sparse_dot_product_forward(vector, ndim, mat_shape, window):
     mat_len = int(np.prod(mat_shape))
 
-    assert ndim * mat_len == np.prod(vector.shape), "not correct shape of vector"
+    assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     result = coo_matrix((len(vector), len(vector)))
 
     for ax in range(ndim):
         for I in range(mat_len):
-            loc_res = one_line_sparse(vector[ax * mat_len:(ax + 1) * mat_len], ndim, I, mat_shape,
+            loc_res = one_line_sparse(vector[ax * mat_len: (ax + 1) * mat_len], ndim, I, mat_shape,
                                       window, ax)
             result += loc_res
 
@@ -209,6 +208,8 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, window):
 
 def sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs=5, path_joblib='~/JOBLIB_TMP_FOLDER/'):
     mat_len = int(np.prod(mat_shape))
+
+    assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
         delayed(one_line_sparse)(

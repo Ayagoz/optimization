@@ -13,12 +13,11 @@ from RegOptim.utils import load_nii
 from RegOptim.preprocessing import change_resolution
 from RegOptim.image_utils import padding
 from RegOptim.optimization.pipeline_utils import get_shape
-from RegOptim.optimization.metrics import count_K_pairwise, count_da_db_pairwise, count_dJ,\
+from RegOptim.optimization.metrics import count_K_pairwise, count_da_db_pairwise, count_dJ, \
     count_K_to_template, count_da_db_to_template
 from RegOptim.optimization.derivatives import template_pipeline_derivatives, pairwise_pipeline_derivatives
 
 joblib_folder = '~/JOBLIB_TMP_FOLDER/'
-
 
 
 def derivatives_of_pipeline_without_template(result, n_total):
@@ -28,9 +27,10 @@ def derivatives_of_pipeline_without_template(result, n_total):
     gc.collect()
     return K, da, db
 
+
 def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape):
     n_train = len(train_idx)
-    Lvfs, vfs, dv_da,dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
+    Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
     shape = np.array(Lvfs).shape[2:]
     ndim = len(shape)
 
@@ -54,23 +54,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
     return K, da, db, dJ
 
 
-# def check_correctness_of_dict(names=None, **kwargs):
-#     if names is None:
-#         names = ['n_step', 'n_iters', 'resolutions', 'smoothing_sigmas', 'delta_phi_threshold',
-#                  'unit_threshold', 'learning_rate']
-# 
-#     if not kwargs.get('reg_params'):
-#         kwargs['reg_params'] = {}
-#         for name in names:
-#             kwargs['reg_params'].update(name, kwargs[name])
-#             del kwargs[name]
-# 
-#         return kwargs
-
-
 def one_to_one(data1, data2, path_to_dJ, **kwargs):
-
-
     a, b = kwargs['a'], kwargs['b']
     # registration
     similarity = rtk.SSD(variance=kwargs['ssd_var'])

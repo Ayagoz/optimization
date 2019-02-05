@@ -185,8 +185,9 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
 
-    # dv_dJ = sparse_dot_product(vector=grad_v.reshape(-1,1), ndim=template.ndim, mat_shape=shape_res[:-template.ndim], window=window,
-    #                            mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
+    dv_dJ = sparse_dot_product(vector=grad_v.reshape(-1, 1).copy(), ndim=template.ndim,
+                               mat_shape=shape_res[:-template.ndim], window=window,
+                               mode='forward', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
     dv_dJ = dl_dJ_dv
     del dl_dv, dl_dJ_dv
 

@@ -6,6 +6,7 @@ import gc
 
 import rtk
 from rtk.registration.LDDMM import derivative
+from RegOptim.optimization.metrics import path_length
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
@@ -104,8 +105,77 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
 
+def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, inverse):
+
+    pass
+
+
+def intergal_of_action(vf, shape, a, b, n_steps):
+    regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
+    regularizer.set_shape(shape)
+    A = regularizer.A
+    K = np.array([path_length(A, vf[i], a, b) for i in range(n_steps + 1)])
+    return 0.5 * (K[1:] + K[:-1])
+
+
+def loss_func(vf, a, b, moving, template, sigma, n_steps, shape, inverse):
+    deformation = deformation_grad(vf, n_steps, shape)
+    deformed_moving, _ = deformation_applied(moving, template, n_steps, deformation, inverse)
+
+    loss = np.sum((deformed_moving[-1] - template) ** 2) / sigma + intergal_of_action(vf, shape, a, b, n_steps)
+
+    return loss
+
+
+def second_derivative_ii(vf, i, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse):
+    loss = loss_func(vf, a, b, moving, template, sigma, n_steps, shape, inverse)
+    copy_vf = vf.copy()
+    copy_vf[i] += epsilon
+    loss_forward = loss_func(copy_vf, a, b, moving, template, sigma, n_steps, shape, inverse)
+    copy_vf = vf.copy()
+    copy_vf[i] -= epsilon
+    loss_backward = loss_func(copy_vf, a, b, moving, template, sigma, n_steps, shape, inverse)
+    return (loss_forward - 2 * loss + loss_backward) / epsilon ** 2
+
+def second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse):
+    # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, y+e))/ (4*e^2) with precision O(h^2)
+
+    vf_forward_ij = vf.copy()
+    vf_forward_ij[i] += epsilon
+    vf_forward_ij[j] += epsilon
+    loss_forward_ij = loss_func(vf_forward_ij, a,b,moving, template, sigma, n_steps, shape, inverse)
+
+    vf_forward_i = vf.copy()
+    vf_forward_i[i] += epsilon
+    vf_forward_i[j] -= epsilon
+    loss_forward_i = loss_func(vf_forward_i, a, b, moving, template, sigma, n_steps, shape, inverse)
+
+    vf_forward_j = vf.copy()
+    vf_forward_j[i] -= epsilon
+    vf_forward_j[j] += epsilon
+    loss_forward_j = loss_func(vf_forward_j, a, b, moving, template, sigma, n_steps, shape, inverse)
+
+
+    vf_backward_ij = vf.copy()
+    vf_backward_ij[i] -= epsilon
+    vf_backward_ij[j] -= epsilon
+    loss_backward_ij = loss_func(vf_backward_ij, a, b, moving, template, sigma, n_steps, shape, inverse)
+
+    return (loss_backward_ij + loss_forward_ij - loss_forward_i - loss_forward_j)/(4 * epsilon**2)
+
+
+def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse):
+    assert len(vf.shape) == len(i) == len(j), "Not correct indices"
+
+    if i == j:
+        return  second_derivative_ii(vf, i, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
+
+    elif i!=j:
+        return  second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
+    else:
+        raise TypeError('you should give correct indices')
+
 def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
-    # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, x+e))/ (4*e^2) with precision O(h^2)
 
     # moving_imgs, template_imgs =
 

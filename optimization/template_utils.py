@@ -105,7 +105,6 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
 
 
 def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, inverse):
-
     pass
 
 
@@ -136,13 +135,14 @@ def second_derivative_ii(vf, i, epsilon, a, b, moving, template, sigma, n_steps,
     loss_backward = loss_func(copy_vf, a, b, moving, template, sigma, n_steps, shape, inverse)
     return (loss_forward - 2 * loss + loss_backward) / epsilon ** 2
 
+
 def second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse):
     # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, y+e))/ (4*e^2) with precision O(h^2)
 
     vf_forward_ij = vf.copy()
     vf_forward_ij[i] += epsilon
     vf_forward_ij[j] += epsilon
-    loss_forward_ij = loss_func(vf_forward_ij, a,b,moving, template, sigma, n_steps, shape, inverse)
+    loss_forward_ij = loss_func(vf_forward_ij, a, b, moving, template, sigma, n_steps, shape, inverse)
 
     vf_forward_i = vf.copy()
     vf_forward_i[i] += epsilon
@@ -154,28 +154,27 @@ def second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_ste
     vf_forward_j[j] += epsilon
     loss_forward_j = loss_func(vf_forward_j, a, b, moving, template, sigma, n_steps, shape, inverse)
 
-
     vf_backward_ij = vf.copy()
     vf_backward_ij[i] -= epsilon
     vf_backward_ij[j] -= epsilon
     loss_backward_ij = loss_func(vf_backward_ij, a, b, moving, template, sigma, n_steps, shape, inverse)
 
-    return (loss_backward_ij + loss_forward_ij - loss_forward_i - loss_forward_j)/(4 * epsilon**2)
+    return (loss_backward_ij + loss_forward_ij - loss_forward_i - loss_forward_j) / (4 * epsilon ** 2)
 
 
 def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse):
     assert len(vf.shape) == len(i) == len(j), "Not correct indices"
 
     if i == j:
-        return  second_derivative_ii(vf, i, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
+        return second_derivative_ii(vf, i, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
 
-    elif i!=j:
-        return  second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
+    elif i != j:
+        return second_derivative_ij(vf, i, j, epsilon, a, b, moving, template, sigma, n_steps, shape, inverse)
     else:
         raise TypeError('you should give correct indices')
 
-def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
 
+def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
     # moving_imgs, template_imgs =
 
     pass
@@ -184,7 +183,6 @@ def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
 def one_line_sparse(vector, ndim, I, shape, window, ax):
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
-
     data = vector[I] * vector[rows, 0]
 
     mat_shape = (ndim * len(vector), ndim * len(vector))
@@ -200,7 +198,8 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, window):
 
     for ax in range(ndim):
         for I in range(mat_len):
-            loc_res = one_line_sparse(vector[ax * mat_len:(ax + 1) * mat_len], ndim, I, mat_shape, window, ax)
+            loc_res = one_line_sparse(vector[ax * mat_len:(ax + 1) * mat_len], ndim, I, mat_shape,
+                                      window, ax)
             result += loc_res
 
     gc.collect()

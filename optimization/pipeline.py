@@ -65,9 +65,6 @@ def one_to_one(data1, data2,  **kwargs):
     if kwargs['file_type'] == 'path':
         data1 = load_nii(data1)
 
-    if path_to_dJ is None:
-        raise TypeError('Variable `path to derivatives dJ` should be initialized.')
-
     if isinstance(data2, (str, np.str, np.string_, np.unicode_)):
         data2 = load_nii(data2)
 

@@ -33,9 +33,6 @@ def create_exp_folders(exp_path, params=None):
     path_to_template = os.path.join(exp_path, 'templates/')
     Path(path_to_template).mkdir(exist_ok=True)
 
-    path_to_dJ = os.path.join(exp_path, 'derivative/')
-    Path(path_to_dJ).mkdir(exist_ok=True)
-
     path_to_kernels = os.path.join(exp_path, 'kernel/')
     Path(path_to_kernels).mkdir(exist_ok=True)
 

@@ -54,7 +54,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
     return K, da, db, dJ
 
 
-def one_to_one(data1, data2, path_to_dJ, **kwargs):
+def one_to_one(data1, data2,  **kwargs):
     a, b = kwargs['a'], kwargs['b']
     # registration
     similarity = rtk.SSD(variance=kwargs['ssd_var'])
@@ -103,7 +103,7 @@ def one_to_one(data1, data2, path_to_dJ, **kwargs):
                                              data=data1, template=data2, a=a, b=b, epsilon=kwargs['epsilon'],
                                              shape=data1.shape, inverse=kwargs['inverse'],
                                              optim_template=kwargs['optim_template'], n_jobs=kwargs['n_jobs'],
-                                             path=path_to_dJ, window=kwargs['window']
+                                              window=kwargs['window']
                                              )
 
     else:
@@ -131,12 +131,12 @@ def count_dist_matrix_to_template(**kwargs):
 
     n = len(data)
 
-    path_to_dJ = os.path.join(exp_path, 'derivative/')
-    path = [os.path.join(path_to_dJ, ntpath.basename(data[i]).split('.')[0] + '.npz') for i in range(n)]
+    # path_to_dJ = os.path.join(exp_path, 'derivative/')
+    # path = [os.path.join(path_to_dJ, ntpath.basename(data[i]).split('.')[0] + '.npz') for i in range(n)]
 
     result = Parallel(n_jobs=kwargs['n_jobs'], temp_folder=kwargs.get('joblib_folder', '~/JOBLIB_TMP_FOLDER/'))(
         delayed(one_to_one)(
-            data1=data[i], data2=kwargs['template'], path_to_dJ=path[i], **kwargs
+            data1=data[i], data2=kwargs['template'], **kwargs
         )
         for i in tqdm(range(n), desc="registration")
     )

@@ -123,7 +123,7 @@ def pairwise_pipeline_derivatives(reg, inverse):
 
 # @profile
 def template_pipeline_derivatives(reg, similarity, regularizer, data, template, a, b,
-                                  epsilon, shape, inverse, optim_template, path,
+                                  epsilon, shape, inverse, optim_template,
                                   n_jobs, window):
     in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
                                    resolutions=reg.resolutions,
@@ -152,7 +152,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
                                         vf_all_in_one_resolution=vf_all_in_one_res,
                                         similarity=similarity, regularizer=regularizer,
-                                        inverse=inverse, path=path, n_jobs=n_jobs, window=window)
+                                        inverse=inverse, n_jobs=n_jobs, window=window)
         # gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
 
@@ -162,7 +162,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
-                            similarity, regularizer, inverse, path, n_jobs=5, window=3):
+                            similarity, regularizer, inverse, n_jobs=5, window=3):
     grad_v, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
                                                    similarity, regularizer, inverse)
 
@@ -178,17 +178,14 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
     #                            mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ)
 
     # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
-    if path is not None:
-        shape_res = (template.ndim,) + template.shape + template.shape
-    else:
-        shape_res = (1, template.ndim) + template.shape + template.shape
+
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
 
     dv_dJ = sparse_dot_product(vector=grad_v.reshape(-1, 1).copy(), ndim=template.ndim,
-                               mat_shape=shape_res[:-template.ndim], window=window,
+                               mat_shape=template.shape, window=window,
                                mode='forward', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
-    dv_dJ = dl_dJ_dv
+
     del dl_dv, dl_dJ_dv
 
     # gc.collect()

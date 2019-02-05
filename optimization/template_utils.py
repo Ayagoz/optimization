@@ -6,7 +6,6 @@ import gc
 
 import rtk
 from rtk.registration.LDDMM import derivative
-from RegOptim.optimization.metrics import path_length
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 

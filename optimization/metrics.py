@@ -4,25 +4,9 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 import rtk
-from RegOptim.optimization.derivatives import get_derivative_Lv
 from RegOptim.ml.ml_utils import expand_dims
 
 
-def path_length(A, vf, a, b):
-    # count
-    # dLv/da = 2(a*delta^2 + b*delta)*v - shape (ndim, image_shape)
-    # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v - shape (ndim, image_shape)
-    # shape of this dLv_da - (n_steps, ndim, image_shape)
-    dLv_da, dLv_db = np.array([get_derivative_Lv(A=A, v=vf[i], a=a, b=b) for i in range(len(vf))]).T
-    # axis (ndim, image_shape)
-    axis = tuple(np.arange(vf.shape)[1:])
-    # sum by space dimensions
-    da, db = np.sum(dLv_da * vf, axis=axis), np.sum(dLv_db * vf, axis=axis)
-    # by time dimensions (approx integral)
-    da = 0.5 * (da[:-1] + da[1:])
-    db = 0.5 * (db[:-1] + db[1:])
-
-    return da, db
 
 
 def count_K_to_template(Lvf, vf, n):

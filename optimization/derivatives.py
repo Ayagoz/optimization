@@ -3,13 +3,30 @@ from rtk import gradient
 
 import numpy as np
 import copy
-#import gc
+# import gc
 from scipy.fftpack import fftn, ifftn
 
 from RegOptim.preprocessing import to_one_resolution
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, full_derivative_by_v
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
+
+
+def path_length(A, vf, a, b):
+    # count
+    # dLv/da = 2(a*delta^2 + b*delta)*v - shape (ndim, image_shape)
+    # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v - shape (ndim, image_shape)
+    # shape of this dLv_da - (n_steps, ndim, image_shape)
+    dLv_da, dLv_db = np.array([get_derivative_Lv(A=A, v=vf[i], a=a, b=b) for i in range(len(vf))]).T
+    # axis (ndim, image_shape)
+    axis = tuple(np.arange(vf.shape)[1:])
+    # sum by space dimensions
+    da, db = np.sum(dLv_da * vf, axis=axis), np.sum(dLv_db * vf, axis=axis)
+    # by time dimensions (approx integral)
+    da = 0.5 * (da[:-1] + da[1:])
+    db = 0.5 * (db[:-1] + db[1:])
+
+    return da, db
 
 
 def get_delta(A, a, b):
@@ -136,22 +153,18 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
                                         vf_all_in_one_resolution=vf_all_in_one_res,
                                         similarity=similarity, regularizer=regularizer,
                                         inverse=inverse, path=path, n_jobs=n_jobs, window=window)
-        #gc.collect()
+        # gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
 
-    #gc.collect()
+    # gc.collect()
 
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
-
-
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
                             similarity, regularizer, inverse, path, n_jobs=5, window=3):
-
     grad_v, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
-                                         similarity, regularizer, inverse)
-
+                                                   similarity, regularizer, inverse)
 
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape
@@ -175,9 +188,8 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
     dv_dJ = sparse_dot_product(vector=inv_grad_v, mat_shape=shape_res[:-template.ndim], window=window,
                                mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
 
-
     del dl_dv, dl_dJ_dv
 
-    #gc.collect()
+    # gc.collect()
 
     return [dv_dJ]

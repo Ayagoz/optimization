@@ -1,12 +1,12 @@
 import os
+import ntpath
+
 import rtk
 
 import numpy as np
 import copy
 import gc
 from tqdm import tqdm
-import ntpath
-# from memory_profiler import profile
 from joblib import Parallel, delayed
 
 from RegOptim.utils import load_nii
@@ -76,9 +76,7 @@ def one_to_one(data1, data2,  **kwargs):
         data1 = padding(data1, ndim=data1.ndim, pad_size=kwargs['pad_size'], mode='edge')
     kwargs['shape'] = data1.shape
     kwargs['ndim'] = data1.ndim
-    # template supposed to be right shape
-    # if data2.shape != data1.shape:
-    #     data2 = np.squeeze(change_resolution(data2, init_resolution, multiple=False))
+
 
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
@@ -118,7 +116,8 @@ def count_dist_matrix_to_template(**kwargs):
         - template (template on which you want to registrate)
         - jobllib_folder (not necessary, just to prevent some bugs)
         - train_idx (if you want to count derivative of dJ)
-        -
+        - reg_params (params of LDDMM)
+        - epsilon, optim_template, inverse, n_jobs, window, add_padding, pad_size ...
     '''
     exp_path = kwargs['exp_path']
     data = kwargs['data']

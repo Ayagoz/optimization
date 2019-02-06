@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 from scipy.sparse import coo_matrix
+from scipy.fftpack import fftn, ifftn
 from joblib import Parallel, delayed
 import gc
 
@@ -8,6 +9,53 @@ import rtk
 from rtk.registration.LDDMM import derivative
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
+
+def get_delta(A, a, b):
+    delta = A - b * np.ones(A.shape)
+    return delta / float(a)
+
+def get_der_dLv(A, v, a, b):
+    # A = (a * delta + bE)
+    # v = Km, m = Lv
+    # L = A^(-2)
+    G = np.zeros(v.shape, dtype=np.complex128)
+    # delta = laplacian
+    delta = get_delta(A, a, b)
+    # turn v into furier space
+    for i in range(len(v)):
+        G[i] = fftn(v[i])
+    # in fourier space we get a simple multiplication and get delta*v, delta^2*v(like Lv)
+    delta_v = G * delta
+    delta2_v = G * delta ** 2
+
+    # get back from fourier space
+    Dv = np.zeros_like(G)
+    D2v = np.zeros_like(G)
+    for i in range(len(v)):
+        Dv[i] = np.real(ifftn(delta_v[i]))
+        D2v[i] = np.real(ifftn(delta2_v[i]))
+
+    # return derivative of Lv
+    # dLv/da = ((a*delta + bE)^2 v)/da = 2(a*delta +bE)*delta*v = 2(a*delta^2 + b*delta)*v
+    # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v
+    del delta2_v, delta_v, G
+    return np.real(2 * a * D2v + 2 * b * Dv), np.real(2 * a * Dv + 2 * b * v)
+
+def path_length(A, vf, a, b):
+    # count
+    # dLv/da = 2(a*delta^2 + b*delta)*v - shape (ndim, image_shape)
+    # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v - shape (ndim, image_shape)
+    # shape of this dLv_da - (n_steps, ndim, image_shape)
+    dLv_da, dLv_db = np.array([get_der_dLv(A=A, v=vf[i], a=a, b=b) for i in range(len(vf))]).T
+    # axis (ndim, image_shape)
+    axis = tuple(np.arange(vf.shape)[1:])
+    # sum by space dimensions
+    da, db = np.sum(dLv_da * vf, axis=axis), np.sum(dLv_db * vf, axis=axis)
+    # by time dimensions (approx integral)
+    da = 0.5 * (da[:-1] + da[1:])
+    db = 0.5 * (db[:-1] + db[1:])
+
+    return da, db
 
 
 def matrix_to_vec_indices(indices, shape):
@@ -173,12 +221,6 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
         raise TypeError('you should give correct indices')
 
 
-def mixed_derivatives(vf, epsilon, similarity, regularizer, n_steps, inverse):
-    # moving_imgs, template_imgs =
-
-    pass
-
-
 def one_line_sparse(vector, ndim, I, shape, window, ax):
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
@@ -249,3 +291,5 @@ def double_dev_J_v(vec):
         cols += list(np.arange(shape) + i * shape)
 
     return coo_matrix((data, (cols, rows)), shape=(np.prod(vec.shape), shape))
+
+

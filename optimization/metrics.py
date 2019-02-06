@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 import rtk
 from RegOptim.ml.ml_utils import expand_dims
-
+from RegOptim.optimization.template_utils import path_length
 
 
 

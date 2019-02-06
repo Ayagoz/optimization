@@ -163,7 +163,7 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
 #
 
 def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, inverse):
-
+    #TODO: write function to compute second derivatives
 
 
     pass
@@ -171,7 +171,7 @@ def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, i
 
 def intergal_of_action(vf, shape, a, b, n_steps):
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
-    regularizer.set_shape(shape)
+    regularizer(shape)
     A = regularizer.A
     K = np.array([path_length(A, vf[i], a, b) for i in range(n_steps + 1)])
     return 0.5 * (K[1:] + K[:-1])

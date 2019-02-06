@@ -16,16 +16,9 @@ import gc
 
 
 def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, add_padding, pad_size):
-    kwargs = {}
-
-    kwargs['file_type'] = params['load_params']['file_type']
-    kwargs['exp_path'] = os.path.join(params['path_to_exp'], params['experiment_name'])
-
-    kwargs['data'] = data
-    kwargs['template'] = template
-    kwargs['ndim'] = params['ndim']
-
-    kwargs['n_jobs'] = params['n_jobs']
+    kwargs = {'file_type': params['load_params']['file_type'],
+              'exp_path': os.path.join(params['path_to_exp'], params['experiment_name']), 'data': data,
+              'template': template, 'ndim': params['ndim'], 'n_jobs': params['n_jobs']}
 
     kwargs.update(params['pipeline_optimization_params'])
 

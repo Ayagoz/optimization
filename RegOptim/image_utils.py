@@ -67,6 +67,9 @@ def binarize(delta, t=0):
 def get_contour3D(image, axis=0, contour_color=150, width=3, mask=True):
     '''
 
+    :param contour_color:
+    :param width:
+    :param mask:
     :param image: last axis of image should be channel if it is
                   and it should be N * W * H
     :param axis: along which axis to find contours, should be one of N, W, H

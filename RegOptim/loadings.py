@@ -71,9 +71,8 @@ def load_target(path, idx, target_type):
 
 def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, balanced=True):
     '''
-    :param path: path to data, architecture of folder proposed:
-                    path - main folder contain subject's folders
-                    path - subj folder - nii folder - nii images
+    :param path_to_data:
+    :param balanced:
     :param data_type: can be one the subcortical structures of brain
                     such as: hippo(hippocamp), thalamus, pallidum, putamen, etc.
     :param target_type: different columns in meta file, or if None means that there exist file '_target.pkl'

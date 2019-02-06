@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import numpy as np
 from RegOptim.utils import load_nii, save_nii, import_func
@@ -66,7 +67,7 @@ def update_template(template, template_path, template_name, delta, learning_rate
         image = template.copy()
 
     if image.shape != delta.shape:
-        print 'Error not correct shape or resolution'
+        print('Error not correct shape or resolution')
         raise TypeError
 
     image -= learning_rate * delta

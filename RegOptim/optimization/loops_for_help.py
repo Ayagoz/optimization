@@ -1,3 +1,11 @@
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
 import numpy as np
 
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -70,8 +78,8 @@ def count_grads_a_b_template(exp_K, y, da, db, dJ, params, n_splits=10, ndim=3, 
         grads_b.append(grad_b)
         grads_J.append(grad_J)
 
-    print "Train score: ", np.mean(roc_aucs)
-    print "Train loss: ", np.mean(losses)
+    print("Train score: ", np.mean(roc_aucs))
+    print("Train loss: ", np.mean(losses))
 
     return np.mean(grads_a), np.mean(grads_b), np.mean(grads_J, axis=0), np.mean(roc_aucs), np.mean(losses)
 
@@ -124,8 +132,8 @@ def count_grads_a_b(exp_K, y, da, db, params, n_splits=10, random_state=0, kerne
         grads_a.append(grad_a)
         grads_b.append(grad_b)
 
-    print "Train score: ", np.mean(roc_aucs)
-    print "Train loss: ", np.mean(losses)
+    print("Train score: ", np.mean(roc_aucs))
+    print("Train loss: ", np.mean(losses))
 
     return np.mean(grads_a), np.mean(grads_b), np.mean(roc_aucs), np.mean(losses)
 
@@ -144,8 +152,8 @@ def test_score_prediction_scaled(K, y, idx_train, idx_test, params):
     lr_best_score = roc_auc_score(y_test, clf.predict_proba(K_test).T[1])
     test_loss = MLE_l2_loss(y_test, clf.predict_log_proba(K_test), clf.coef_)
 
-    print "Test scores: ", lr_best_score
-    print "Test loss: ", test_loss
+    print("Test scores: ", lr_best_score)
+    print("Test loss: ", test_loss)
 
     return lr_best_score, test_loss
 
@@ -162,8 +170,8 @@ def test_score_prediction(K, y, idx_train, idx_test, params):
 
     lr_best_score = roc_auc_score(y_test, clf.predict_proba(K_test).T[1])
     test_loss = MLE_l2_loss(y_test, clf.predict_log_proba(K_test), clf.coef_)
-    print "Test scores: ", lr_best_score
-    print "Test loss: ", test_loss
+    print("Test scores: ", lr_best_score)
+    print("Test loss: ", test_loss)
 
     return lr_best_score, test_loss
 

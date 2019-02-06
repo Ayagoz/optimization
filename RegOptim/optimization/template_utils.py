@@ -151,7 +151,21 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
 
+
+#
+# def one_line_sparse(vector, ndim, I, shape, window, ax):
+#     cols = neighbours_indices(shape, I, 'vec', window)
+#     rows = np.repeat(I, len(cols))
+#     data = vector[I] * vector[rows, 0]
+#
+#     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
+#     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
+#
+
 def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, inverse):
+
+
+
     pass
 
 

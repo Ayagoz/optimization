@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import print_function
+from __future__ import print_function
 from RegOptim.utils import import_func
 from RegOptim.optimization.pipeline import count_dist_matrix_to_template
 from RegOptim.ml.ml_utils import find_pipeline_params, adam_step
@@ -76,8 +79,8 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 
         st = time.time()
 
-        print 'For iter {}'.format(int(it))
-        print 'For params a {} and b {}'.format(a_it[-1], b_it[-1])
+        print('For iter {}'.format(int(it)))
+        print('For params a {} and b {}'.format(a_it[-1], b_it[-1]))
 
         if optim_template:
             template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding = optimize_template_step(
@@ -104,7 +107,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
             results.loc[it - 1] = [it, a_it[-1], b_it[-1], best_params['ml__C'], train_score,
                                    train_loss, test_score, test_loss, time.time() - st, pad_size]
 
-        print "one loop time: ", time.time() - st
+        print("one loop time: ", time.time() - st)
 
         a_it += [a_it[-1] - lr * adam_grad_da]
         b_it += [b_it[-1] - lr * adam_grad_db]

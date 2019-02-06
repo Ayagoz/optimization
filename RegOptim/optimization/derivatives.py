@@ -1,3 +1,4 @@
+from __future__ import print_function
 import rtk
 from rtk import gradient
 
@@ -49,7 +50,7 @@ def get_derivative_v(a, b, reg, epsilon=0.1, inverse=True, data=None, template=N
         # inverse means that we would like to find path from X to template
         # it means that we would like to find vf[-1] ~ vf^(-1)[0]
         if data is None or template is None:
-            print 'Error, not optimized LDDMM registration is passed'
+            print('Error, not optimized LDDMM registration is passed')
             raise TypeError
         if inverse:
             # first image fixed, second moving

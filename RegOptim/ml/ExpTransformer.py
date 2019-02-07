@@ -11,11 +11,11 @@ class ExpTransformer(BaseEstimator, ClassifierMixin):
     def fit(self, X, y=None):
         pass
 
-    def transform(self, X, y=None):
+    def transform(self, X):
         return 1 - np.exp(-self.gamma * X)
 
     def fit_transform(self, X, y=None):
-        return self.transform(X, y)
+        return self.transform(X)
 
     def set_params(self, gamma):
         self.gamma = gamma

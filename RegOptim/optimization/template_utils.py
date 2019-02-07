@@ -154,7 +154,6 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
 
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
-
 def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
     vf_forward = vf.copy()
     vf_forward[J] += epsilon

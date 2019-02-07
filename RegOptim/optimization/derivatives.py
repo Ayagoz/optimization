@@ -1,13 +1,14 @@
 from __future__ import print_function
-import rtk
-from rtk import gradient
 
-import numpy as np
 import copy
 
-from RegOptim.preprocessing import to_one_resolution
+import numpy as np
+
+import rtk
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, \
     full_derivative_by_v, get_der_dLv
+from RegOptim.preprocessing import to_one_resolution
+from rtk import gradient
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
@@ -102,7 +103,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
         dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
                                         vf_all_in_one_resolution=vf_all_in_one_res,
                                         similarity=similarity, regularizer=regularizer,
-                                        inverse=inverse, n_jobs=n_jobs, window=window)
+                                        inverse=inverse, epsilon=epsilon, n_jobs=n_jobs, window=window)
         # gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
 
@@ -111,7 +112,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
-def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
+def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
                             similarity, regularizer, inverse, n_jobs=5, window=3):
     grad_v, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
                                                    similarity, regularizer, inverse)
@@ -130,10 +131,21 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution,
     # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
+    if inverse:
+        tmp = template
+        T = -1
+    else:
+        T = 0
+        tmp = data
 
-    dv_dJ = sparse_dot_product(vector=grad_v.reshape(-1, 1).copy(), ndim=template.ndim,
-                               mat_shape=template.shape, window=window,
-                               mode='parallel', n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
+    params_grad = {'moving': moving_img, 'template': tmp, 'epsilon': epsilon,
+                   'inverse': inverse, 'n_steps': n_steps,
+                   'similarity': similarity, 'regularizer': regularizer
+                   }
+    #TODO: manage correct derivatives
+    dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution.reshape(-1, 1).copy(), ndim=template.ndim,
+                               mat_shape=template.shape, window=window, params_grad=params_grad,
+                               mode='parallel', n_jobs=n_jobs, path=joblib_path, ).dot(dl_dJ_dv)
 
     del dl_dv, dl_dJ_dv
 

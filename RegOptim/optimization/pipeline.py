@@ -1,21 +1,20 @@
-import os
-import ntpath
-
 import rtk
 
-import numpy as np
 import copy
 import gc
-from tqdm import tqdm
-from joblib import Parallel, delayed
 
-from RegOptim.utils import load_nii
-from RegOptim.preprocessing import change_resolution
+import numpy as np
+from joblib import Parallel, delayed
+from tqdm import tqdm
+
+import rtk
 from RegOptim.image_utils import padding
-from RegOptim.optimization.pipeline_utils import get_shape
+from RegOptim.optimization.derivatives import template_pipeline_derivatives, pairwise_pipeline_derivatives
 from RegOptim.optimization.metrics import count_K_pairwise, count_da_db_pairwise, count_dJ, \
     count_K_to_template, count_da_db_to_template
-from RegOptim.optimization.derivatives import template_pipeline_derivatives, pairwise_pipeline_derivatives
+from RegOptim.optimization.pipeline_utils import get_shape
+from RegOptim.preprocessing import change_resolution
+from RegOptim.utils import load_nii
 
 joblib_folder = '~/JOBLIB_TMP_FOLDER/'
 

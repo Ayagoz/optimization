@@ -1,13 +1,14 @@
 from __future__ import print_function
+
+import json
 import os
+
 import numpy as np
-from RegOptim.utils import load_nii, save_nii, import_func
-from RegOptim.preprocessing import change_resolution
+
 from RegOptim.image_utils import get_contour2D, get_contour3D, padding, binarize, get_outside_filled, \
     find_threshold_gray_scale
-
-from pathlib2 import Path
-import json
+from RegOptim.preprocessing import change_resolution
+from RegOptim.utils import load_nii, save_nii, import_func
 
 
 def get_shape(img):
@@ -26,16 +27,16 @@ def optim_template_strategy(it, k=10):
 
 
 def create_exp_folders(exp_path, params=None):
-    Path(exp_path).mkdir(exist_ok=True)
+    os.makedirs(exp_path, exist_ok=True)
 
     if params is not None:
         json.dump(params, open(os.path.join(exp_path, 'pipeline_params.txt'), 'w'))
 
     path_to_template = os.path.join(exp_path, 'templates/')
-    Path(path_to_template).mkdir(exist_ok=True)
+    os.makedirs(path_to_template, exist_ok=True)
 
     path_to_kernels = os.path.join(exp_path, 'kernel/')
-    Path(path_to_kernels).mkdir(exist_ok=True)
+    os.makedirs(path_to_kernels, exist_ok=True)
 
 
 def create_template(path_to_data, train_idx, path_to_template, template_name,

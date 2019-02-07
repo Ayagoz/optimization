@@ -31,11 +31,7 @@
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/validate.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/validate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RegOptim/ml/ExpTransformer.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/ml/ExpTransformer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RegOptim/optimization/derivatives.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/derivatives.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RegOptim/optimization/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/pipeline.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RegOptim/optimization/pipeline_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/pipeline_utils.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -90,13 +86,25 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/../image_registration/rtk/registration/LDDMM.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="298">
               <caret line="49" column="32" selection-start-line="49" selection-start-column="32" selection-end-line="49" selection-end-column="32" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/RegOptim/optimization/pipeline_utils.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="504">
+              <caret line="38" column="16" selection-start-line="38" selection-start-column="16" selection-end-line="38" selection-end-column="16" />
+              <folding>
+                <element signature="e#0#37#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -129,7 +137,7 @@
     </leaf>
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../image_registration" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
@@ -161,6 +169,7 @@
         <option value="$PROJECT_DIR$/../image_registration/rtk/registration/LDDMM.py" />
         <option value="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" />
         <option value="$PROJECT_DIR$/RegOptim/optimization/derivatives.py" />
+        <option value="$PROJECT_DIR$/RegOptim/optimization/pipeline_utils.py" />
       </list>
     </option>
   </component>
@@ -254,12 +263,12 @@
       <updated>1549461813735</updated>
       <workItem from="1549461815095" duration="5090000" />
       <workItem from="1549529648207" duration="6171000" />
-      <workItem from="1549563824384" duration="1344000" />
+      <workItem from="1549563824384" duration="1542000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="12605000" />
+    <option name="totallyTimeSpent" value="12803000" />
   </component>
   <component name="TodoView" selected-index="2">
     <todo-panel id="selected-file">
@@ -274,7 +283,7 @@
     <frame x="68" y="-8" width="1853" height="1089" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.17268184" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.17268184" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -287,7 +296,7 @@
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Version Control" order="8" weight="0.32948583" />
       <window_info anchor="bottom" id="Database Changes" order="9" />
-      <window_info active="true" anchor="bottom" id="Inspection Results" order="10" visible="true" weight="0.29179978" />
+      <window_info anchor="bottom" id="Inspection Results" order="10" visible="true" weight="0.29179978" />
       <window_info anchor="bottom" id="Terminal" order="11" />
       <window_info anchor="bottom" id="Event Log" order="12" side_tool="true" />
       <window_info anchor="bottom" id="Python Console" order="13" />
@@ -646,6 +655,16 @@
           <caret line="49" column="32" selection-start-line="49" selection-start-column="32" selection-end-line="49" selection-end-column="32" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/RegOptim/optimization/pipeline_utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="504">
+          <caret line="38" column="16" selection-start-line="38" selection-start-column="16" selection-end-line="38" selection-end-column="16" />
+          <folding>
+            <element signature="e#0#37#0" expanded="true" />
           </folding>
         </state>
       </provider>

@@ -1,18 +1,21 @@
-import numpy as np
-import itertools
-from scipy.sparse import coo_matrix
-from scipy.fftpack import fftn, ifftn
-from joblib import Parallel, delayed
 import gc
+import itertools
+
+import numpy as np
+from joblib import Parallel, delayed
+from scipy.fftpack import fftn, ifftn
+from scipy.sparse import coo_matrix
 
 import rtk
 from rtk.registration.LDDMM import derivative
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
+
 def get_delta(A, a, b):
     delta = A - b * np.ones(A.shape)
     return delta / float(a)
+
 
 def get_der_dLv(A, v, a, b):
     # A = (a * delta + bE)
@@ -40,6 +43,7 @@ def get_der_dLv(A, v, a, b):
     # dLv/db = 2(a*delta + bE) * E * v = 2(a*delta + bE)v
     del delta2_v, delta_v, G
     return np.real(2 * a * D2v + 2 * b * Dv), np.real(2 * a * Dv + 2 * b * v)
+
 
 def path_length(A, vf, a, b):
     # count
@@ -151,22 +155,16 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
 
+def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
+    vf_forward = vf.copy()
+    vf_forward[J] += epsilon
+    vf_backward = vf.copy()
+    vf_backward[J] += epsilon
 
-#
-# def one_line_sparse(vector, ndim, I, shape, window, ax):
-#     cols = neighbours_indices(shape, I, 'vec', window)
-#     rows = np.repeat(I, len(cols))
-#     data = vector[I] * vector[rows, 0]
-#
-#     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
-#     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
-#
+    grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
+    grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
 
-def grad_of_derivative(moving, template, n_steps, vf, similarity, regularizer, inverse):
-    #TODO: write function to compute second derivatives
-
-
-    pass
+    return ((grad_forward - grad_backward) / (2 * epsilon))[I]
 
 
 def intergal_of_action(vf, shape, a, b, n_steps):
@@ -235,16 +233,20 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
         raise TypeError('you should give correct indices')
 
 
-def one_line_sparse(vector, ndim, I, shape, window, ax):
+def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
-    data = vector[I] * vector[rows, 0]
+    source = tuple(vec_to_matrix_indices(I, shape))
+    target = [tuple(vec_to_matrix_indices(j, shape)) for j in cols]
+
+    data = [grad_of_derivative(I=(ax,) + source, J=(ax,) + j, vf=vector.reshape((ndim,) + shape), **params_grad)
+            for j in target]
 
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, window):
+def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad):
     mat_len = int(np.prod(mat_shape))
 
     assert ndim * mat_len == len(vector), "not correct shape of vector"
@@ -253,8 +255,8 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, window):
 
     for ax in range(ndim):
         for I in range(mat_len):
-            loc_res = one_line_sparse(vector[ax * mat_len: (ax + 1) * mat_len], ndim, I, mat_shape,
-                                      window, ax)
+            loc_res = one_line_sparse(vector, ndim, I, mat_shape,
+                                      window, ax, params_grad)
             result += loc_res
 
     gc.collect()
@@ -262,15 +264,15 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, window):
     return result
 
 
-def sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs=5, path_joblib='~/JOBLIB_TMP_FOLDER/'):
+def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grads, n_jobs=5,
+                                path_joblib='~/JOBLIB_TMP_FOLDER/'):
     mat_len = int(np.prod(mat_shape))
 
     assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
         delayed(one_line_sparse)(
-            vector[ax * mat_len: (ax + 1) * mat_len],
-            ndim, I, mat_shape, window, ax
+            vector, ndim, I, mat_shape, window, ax, params_grads
         )
         for I in range(mat_len) for ax in range(ndim)
     )
@@ -284,11 +286,12 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs=5, path_
     return result
 
 
-def sparse_dot_product(vector, ndim, mat_shape, window=2, mode='parallel', n_jobs=5, path=joblib_path):
+def sparse_dot_product(vector, ndim, mat_shape, params_grad, window=2, mode='parallel',
+                       n_jobs=5, path=joblib_path):
     if mode == 'forward':
-        return sparse_dot_product_forward(vector, ndim, mat_shape, window)
+        return sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad)
     elif mode == 'parallel':
-        return sparse_dot_product_parallel(vector, ndim, mat_shape, window, n_jobs, path)
+        return sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grad, n_jobs, path)
     else:
         raise TypeError('Do not support such type of calculating')
 
@@ -305,5 +308,3 @@ def double_dev_J_v(vec):
         cols += list(np.arange(shape) + i * shape)
 
     return coo_matrix((data, (cols, rows)), shape=(np.prod(vec.shape), shape))
-
-

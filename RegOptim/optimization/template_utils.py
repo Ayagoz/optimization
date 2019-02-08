@@ -154,17 +154,6 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
 
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
-def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
-    vf_forward = vf.copy()
-    vf_forward[J] += epsilon
-    vf_backward = vf.copy()
-    vf_backward[J] += epsilon
-
-    grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
-    grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
-
-    return ((grad_forward - grad_backward) / (2 * epsilon))[I]
-
 
 def intergal_of_action(vf, shape, a, b, n_steps):
     regularizer = rtk.BiharmonicRegularizer(convexity_penalty=a, norm_penalty=b)
@@ -232,7 +221,46 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
         raise TypeError('you should give correct indices')
 
 
+# def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse):
+#     deformation = deformation_grad(vf, n_steps, template.shape)
+#
+#     moving_imgs, template_imgs = deformation_applied(moving, template, n_steps, deformation, inverse)
+#
+#     if inverse:
+#         T = -1
+#     else:
+#         T = 0
+#
+#     grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
+#                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
+#                                   vector_field=vf[T],
+#                                   regularizer=regularizer, learning_rate=1.)])
+#
+#     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
+
+def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
+    if inverse:
+        T = -1
+    else:
+        T = 0
+
+    vf_forward = vf.copy()
+    vf_forward[T][J] += epsilon
+    vf_backward = vf.copy()
+    vf_backward[T][J] += epsilon
+
+    grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
+    grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
+
+    return ((grad_forward - grad_backward) / (2 * epsilon))[I]
+
+
 def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
+    if params_grad['inverse']:
+        params_grad['T'] = -1
+    else:
+        params_grad['T'] = 0
+
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
     source = tuple(vec_to_matrix_indices(I, shape))

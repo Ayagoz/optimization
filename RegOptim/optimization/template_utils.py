@@ -97,8 +97,10 @@ def create_arange(i, l, w=2):
 def neighbours_indices(shape, I, mode='vec', window=3):
     n = len(shape)
     w = window / 2
-
-    indices = vec_to_matrix_indices(I, shape)
+    if mode == 'vec':
+        indices = vec_to_matrix_indices(I, shape)
+    else:
+        indices = I
 
     bounds = [create_arange(i=indices[i], l=shape[i], w=w) for i in range(n)]
 
@@ -243,7 +245,7 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     cols = neighbours_indices(shape, I, 'mat', window)
     rows = np.repeat(I, len(cols))
 
-
+    print(cols, I)
 
     data = [
         grad_of_derivative(I=(T, ax,) + I,

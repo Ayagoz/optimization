@@ -149,8 +149,7 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
 
     grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
-                                  vector_field=vf[T],
-                                  regularizer=regularizer, learning_rate=1.)])
+                                  vector_field=vf[T], regularizer=regularizer, learning_rate=1.)])
 
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
 
@@ -222,14 +221,16 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
 
 
 def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
-    print(J, I)
+    
     vf_forward = vf.copy()
     vf_forward[J] += epsilon
     vf_backward = vf.copy()
     vf_backward[J] += epsilon
-    print(vf_backward.shape, vf_forward.shape)
-    grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
-    grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
+
+    grad_forward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_forward,
+                                              similarity=similarity, regularizer=regularizer, inverse=inverse)
+    grad_backward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_backward,
+                                               similarity=similarity, regularizer=regularizer, inverse=inverse)
 
     return ((grad_forward - grad_backward) / (2 * epsilon))[I]
 
@@ -245,7 +246,7 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
 
     source = tuple(vec_to_matrix_indices(I, shape))
     target = [tuple(vec_to_matrix_indices(j, shape)) for j in cols]
-    
+
     data = [
         grad_of_derivative(I=(T, ax,) + source,
                            J=(T, ax,) + j,

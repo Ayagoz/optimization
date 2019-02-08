@@ -222,6 +222,7 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
 
 
 def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
+    print(J, I)
     vf_forward = vf.copy()
     vf_forward[J] += epsilon
     vf_backward = vf.copy()

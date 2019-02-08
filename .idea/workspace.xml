@@ -31,7 +31,6 @@
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/validate.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/validate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RegOptim/optimization/derivatives.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/derivatives.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -57,8 +56,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/RegOptim/optimization/template_utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="471">
-              <caret line="261" column="4" lean-forward="true" selection-start-line="261" selection-start-column="5" selection-end-line="262" selection-end-column="73" />
+            <state relative-caret-position="281">
+              <caret line="224" column="14" lean-forward="true" selection-start-line="224" selection-start-column="14" selection-end-line="224" selection-end-column="14" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -196,12 +195,12 @@
       <workItem from="1549461815095" duration="5090000" />
       <workItem from="1549529648207" duration="6171000" />
       <workItem from="1549563824384" duration="2007000" />
-      <workItem from="1549629053270" duration="3975000" />
+      <workItem from="1549629053270" duration="4475000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="17243000" />
+    <option name="totallyTimeSpent" value="17743000" />
   </component>
   <component name="TodoView" selected-index="2">
     <todo-panel id="selected-file">
@@ -594,8 +593,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/RegOptim/optimization/template_utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="471">
-          <caret line="261" column="4" lean-forward="true" selection-start-line="261" selection-start-column="5" selection-end-line="262" selection-end-column="73" />
+        <state relative-caret-position="281">
+          <caret line="224" column="14" lean-forward="true" selection-start-line="224" selection-start-column="14" selection-end-line="224" selection-end-column="14" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>

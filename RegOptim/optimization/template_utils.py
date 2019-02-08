@@ -227,7 +227,7 @@ def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity,
     vf_forward[J] += epsilon
     vf_backward = vf.copy()
     vf_backward[J] += epsilon
-
+    print(vf_backward.shape, vf_forward.shape)
     grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
     grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
 
@@ -245,7 +245,7 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
 
     source = tuple(vec_to_matrix_indices(I, shape))
     target = [tuple(vec_to_matrix_indices(j, shape)) for j in cols]
-
+    
     data = [
         grad_of_derivative(I=(T, ax,) + source,
                            J=(T, ax,) + j,

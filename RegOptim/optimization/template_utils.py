@@ -74,7 +74,7 @@ def vec_to_matrix_indices(I, shape):
     dot = np.array([np.prod(shape[::-1][:-i]) for i in range(1, n)] + [1])
     indices = np.array([dot[0] + 1] + list(shape[1:]))
 
-    return np.array([I / dot[i] % indices[i] for i in range(n)])
+    return np.array([I / dot[i] % indices[i] for i in range(n)]).astype(int)
 
 
 def create_arange(i, l, w=2):

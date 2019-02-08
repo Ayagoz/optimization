@@ -105,10 +105,10 @@ def neighbours_indices(shape, I, mode='vec', window=3):
     idx = list(itertools.product(*bounds))
 
     if mode == 'mat':
-        return idx
+        return np.array(idx).astype(int)
     elif mode == 'vec':
         idx = np.array(idx)
-        return np.array([matrix_to_vec_indices(idx[i], shape) for i in range(len(idx))])
+        return np.array([matrix_to_vec_indices(idx[i], shape) for i in range(len(idx))]).astype(int)
 
     else:
         raise TypeError('Not correct mode, support just `vec` and `mat`')
@@ -240,18 +240,17 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     else:
         T = 0
 
-    cols = neighbours_indices(shape, I, 'vec', window)
+    cols = neighbours_indices(shape, I, 'mat', window)
     rows = np.repeat(I, len(cols))
 
-    source = tuple(vec_to_matrix_indices(I, shape))
-    target = [tuple(vec_to_matrix_indices(j, shape)) for j in cols]
+
 
     data = [
-        grad_of_derivative(I=(T, ax,) + source,
+        grad_of_derivative(I=(T, ax,) + I,
                            J=(T, ax,) + j,
                            vf=vector, **params_grad
                            )
-        for j in target
+        for j in cols
     ]
 
     mat_shape = (ndim * params_grad['n_steps'] * np.prod(shape), ndim * params_grad['n_steps'] * np.prod(shape))

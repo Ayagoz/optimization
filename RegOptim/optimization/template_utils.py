@@ -258,12 +258,12 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grads):
+def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad):
     mat_len = int(np.prod(mat_shape))
     #
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
-    result = coo_matrix((ndim * params_grads['n_steps'] * mat_len, ndim * params_grads['n_steps'] * mat_len))
+    result = coo_matrix((ndim * params_grad['n_steps'] * mat_len, ndim * params_grad['n_steps'] * mat_len))
 
     for ax in range(ndim):
         for I in range(mat_len):
@@ -276,7 +276,7 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grads):
     return result
 
 
-def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grads, n_jobs=5,
+def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grad, n_jobs=5,
                                 path_joblib='~/JOBLIB_TMP_FOLDER/'):
     mat_len = int(np.prod(mat_shape))
 
@@ -284,15 +284,15 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grads, n
 
     loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
         delayed(one_line_sparse)(
-            vector, ndim, I, mat_shape, window, ax, params_grads
+            vector, ndim, I, mat_shape, window, ax, params_grad
         )
         for I in range(mat_len) for ax in range(ndim)
     )
 
     gc.collect()
 
-    result = coo_matrix((ndim * params_grads['n_steps'] * mat_len,
-                         ndim * params_grads['n_steps'] * mat_len))
+    result = coo_matrix((ndim * params_grad['n_steps'] * mat_len,
+                         ndim * params_grad['n_steps'] * mat_len))
     for one in loc_res:
         result += one
 

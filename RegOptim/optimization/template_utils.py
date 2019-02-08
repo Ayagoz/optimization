@@ -221,7 +221,6 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
 
 
 def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
-    
     vf_forward = vf.copy()
     vf_forward[J] += epsilon
     vf_backward = vf.copy()
@@ -255,16 +254,16 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
         for j in target
     ]
 
-    mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
+    mat_shape = (ndim * params_grad['n_steps'] * np.prod(shape), ndim * params_grad['n_steps'] * np.prod(shape))
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad):
+def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grads):
     mat_len = int(np.prod(mat_shape))
     #
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
-    result = coo_matrix((len(vector), len(vector)))
+    result = coo_matrix((ndim * params_grads['n_steps'] * mat_len, ndim * params_grads['n_steps'] * mat_len))
 
     for ax in range(ndim):
         for I in range(mat_len):
@@ -292,7 +291,8 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grads, n
 
     gc.collect()
 
-    result = coo_matrix((len(vector), len(vector)))
+    result = coo_matrix((ndim * params_grads['n_steps'] * mat_len,
+                         ndim * params_grads['n_steps'] * mat_len))
     for one in loc_res:
         result += one
 

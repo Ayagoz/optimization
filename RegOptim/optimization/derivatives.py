@@ -143,7 +143,7 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
                    'similarity': similarity, 'regularizer': regularizer
                    }
     #TODO: manage correct derivatives
-    dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution.reshape(-1, 1).copy(), ndim=template.ndim,
+    dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution, ndim=template.ndim,
                                mat_shape=template.shape, window=window, params_grad=params_grad,
                                mode='parallel', n_jobs=n_jobs, path=joblib_path, ).dot(dl_dJ_dv)
 

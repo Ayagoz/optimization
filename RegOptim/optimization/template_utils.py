@@ -221,33 +221,11 @@ def second_derivative_by_loss(vf, i, j, epsilon, a, b, moving, template, sigma, 
         raise TypeError('you should give correct indices')
 
 
-# def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse):
-#     deformation = deformation_grad(vf, n_steps, template.shape)
-#
-#     moving_imgs, template_imgs = deformation_applied(moving, template, n_steps, deformation, inverse)
-#
-#     if inverse:
-#         T = -1
-#     else:
-#         T = 0
-#
-#     grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
-#                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
-#                                   vector_field=vf[T],
-#                                   regularizer=regularizer, learning_rate=1.)])
-#
-#     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
-
 def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity, regularizer, inverse):
-    if inverse:
-        T = -1
-    else:
-        T = 0
-
     vf_forward = vf.copy()
-    vf_forward[T][J] += epsilon
+    vf_forward[J] += epsilon
     vf_backward = vf.copy()
-    vf_backward[T][J] += epsilon
+    vf_backward[J] += epsilon
 
     grad_forward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_forward, similarity, regularizer, inverse)
     grad_backward, _, _ = full_derivative_by_v(moving, template, n_steps, vf_backward, similarity, regularizer, inverse)
@@ -257,17 +235,23 @@ def grad_of_derivative(I, J, epsilon, moving, template, n_steps, vf, similarity,
 
 def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     if params_grad['inverse']:
-        params_grad['T'] = -1
+        T = -1
     else:
-        params_grad['T'] = 0
+        T = 0
 
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
+
     source = tuple(vec_to_matrix_indices(I, shape))
     target = [tuple(vec_to_matrix_indices(j, shape)) for j in cols]
 
-    data = [grad_of_derivative(I=(ax,) + source, J=(ax,) + j, vf=vector.reshape((ndim,) + shape), **params_grad)
-            for j in target]
+    data = [
+        grad_of_derivative(I=(T, ax,) + source,
+                           J=(T, ax,) + j,
+                           vf=vector, **params_grad
+                           )
+        for j in target
+    ]
 
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
@@ -275,8 +259,8 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
 
 def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad):
     mat_len = int(np.prod(mat_shape))
-
-    assert ndim * mat_len == len(vector), "not correct shape of vector"
+    #
+    # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     result = coo_matrix((len(vector), len(vector)))
 
@@ -295,7 +279,7 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grads, n
                                 path_joblib='~/JOBLIB_TMP_FOLDER/'):
     mat_len = int(np.prod(mat_shape))
 
-    assert ndim * mat_len == len(vector), "not correct shape of vector"
+    # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
         delayed(one_line_sparse)(

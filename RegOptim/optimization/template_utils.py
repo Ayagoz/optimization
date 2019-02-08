@@ -97,10 +97,8 @@ def create_arange(i, l, w=2):
 def neighbours_indices(shape, I, mode='vec', window=3):
     n = len(shape)
     w = window / 2
-    if mode == 'vec':
-        indices = vec_to_matrix_indices(I, shape)
-    else:
-        indices = I
+
+    indices = vec_to_matrix_indices(I, shape)
 
     bounds = [create_arange(i=indices[i], l=shape[i], w=w) for i in range(n)]
 
@@ -242,20 +240,22 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad):
     else:
         T = 0
 
-    cols = neighbours_indices(shape, I, 'mat', window)
+
+    cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
 
-    print(cols, I)
+    print(I, cols, vector.shape)
+    print(vec_to_matrix_indices(I, shape), vec_to_matrix_indices(cols[0], shape))
 
     data = [
-        grad_of_derivative(I=(T, ax,) + I,
-                           J=(T, ax,) + j,
+        grad_of_derivative(I=(T, ax,) + vec_to_matrix_indices(I, shape),
+                           J=(T, ax,) + vec_to_matrix_indices(j, shape),
                            vf=vector, **params_grad
                            )
         for j in cols
     ]
 
-    mat_shape = (ndim * params_grad['n_steps'] * np.prod(shape), ndim * params_grad['n_steps'] * np.prod(shape))
+    mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
     return coo_matrix((data, (rows + ax * np.prod(shape), cols + ax * np.prod(shape))), shape=mat_shape)
 
 

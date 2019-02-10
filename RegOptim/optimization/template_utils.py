@@ -255,6 +255,9 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad, param_der):
     cols = neighbours_indices(shape, I, 'vec', window)
     rows = np.repeat(I, len(cols))
 
+    print('shape', shape)
+    print('i',(T, ax,) + tuple(vec_to_matrix_indices(I, shape)))
+    print('j', [(T, ax,) + tuple(vec_to_matrix_indices(j, shape)) for j in cols])
     derivative_func = import_func(**param_der)
     data = np.array([
         derivative_func(i=(T, ax,) + tuple(vec_to_matrix_indices(I, shape)),

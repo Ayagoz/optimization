@@ -39,6 +39,7 @@ def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, a
     kwargs['optim_template'] = optim_template
     kwargs['add_padding'] = add_padding
     kwargs['pad_size'] = pad_size
+    kwargs['params_der'] = params['derivative_J_params']
 
     return kwargs
 

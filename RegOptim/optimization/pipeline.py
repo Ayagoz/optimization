@@ -1,5 +1,3 @@
-import rtk
-
 import copy
 import gc
 
@@ -53,7 +51,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
     return K, da, db, dJ
 
 
-def one_to_one(data1, data2,  **kwargs):
+def one_to_one(data1, data2, **kwargs):
     a, b = kwargs['a'], kwargs['b']
     # registration
     similarity = rtk.SSD(variance=kwargs['ssd_var'])
@@ -76,7 +74,6 @@ def one_to_one(data1, data2,  **kwargs):
     kwargs['shape'] = data1.shape
     kwargs['ndim'] = data1.ndim
 
-
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
 
@@ -96,8 +93,8 @@ def one_to_one(data1, data2,  **kwargs):
         return template_pipeline_derivatives(reg=reg, similarity=similarity, regularizer=regularizer,
                                              data=data1, template=data2, a=a, b=b, epsilon=kwargs['epsilon'],
                                              shape=data1.shape, inverse=kwargs['inverse'],
-                                             optim_template=kwargs['optim_template'], n_jobs=kwargs['n_jobs'],
-                                              window=kwargs['window']
+                                             params_der=kwargs['params_der'], optim_template=kwargs['optim_template'],
+                                             n_jobs=kwargs['n_jobs'], window=kwargs['window']
                                              )
 
     else:

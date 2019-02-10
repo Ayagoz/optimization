@@ -3,6 +3,7 @@ from __future__ import print_function
 import copy
 
 import numpy as np
+from memory_profiler import profile
 
 import rtk
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, \
@@ -74,7 +75,7 @@ def pairwise_pipeline_derivatives(reg, inverse):
 
 # @profile
 def template_pipeline_derivatives(reg, similarity, regularizer, data, template, a, b,
-                                  epsilon, shape, inverse, optim_template,
+                                  epsilon, shape, inverse, optim_template, params_der,
                                   n_jobs, window):
     in_one_res = to_one_resolution(resulting_vector_fields=reg.resulting_vector_fields,
                                    resolutions=reg.resolutions,
@@ -102,7 +103,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     if optim_template:
         dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
                                         vf_all_in_one_resolution=vf_all_in_one_res,
-                                        similarity=similarity, regularizer=regularizer,
+                                        similarity=similarity, regularizer=regularizer,params_der=params_der,
                                         inverse=inverse, epsilon=epsilon, n_jobs=n_jobs, window=window)
         # gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
@@ -112,8 +113,9 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
+@profile
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
-                            similarity, regularizer, inverse, n_jobs=5, window=3):
+                            similarity, regularizer, inverse, n_jobs, params_der, window=3):
     grad_v, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
                                                    similarity, regularizer, inverse)
 
@@ -132,20 +134,21 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
     if inverse:
-        tmp = template
-        T = -1
+        tmp2 = data.copy()
+        tmp1 = template.copy()
     else:
-        T = 0
-        tmp = data
+        tmp2 = template.copy()
+        tmp1 = data.copy()
 
-    params_grad = {'moving': moving_img, 'template': tmp, 'epsilon': epsilon,
+    params_grad = {'moving':tmp2 , 'template': tmp1, 'epsilon': epsilon,
                    'inverse': inverse, 'n_steps': n_steps,
-                   'similarity': similarity, 'regularizer': regularizer
+                   'similarity': similarity, 'regularizer': regularizer,
+
                    }
-    #TODO: manage correct derivatives
+
     dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution, ndim=template.ndim,
                                mat_shape=template.shape, window=window, params_grad=params_grad,
-                               mode='parallel', n_jobs=n_jobs, path=joblib_path, ).dot(dl_dJ_dv)
+                               mode='forward',param_der=params_der,  n_jobs=n_jobs, path=joblib_path, ).dot(dl_dJ_dv)
 
     del dl_dv, dl_dJ_dv
 

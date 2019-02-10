@@ -95,18 +95,19 @@ def create_arange(i, l, w=2):
         if i + w >= l:
             i_ = np.arange(i - w, l)
 
-        else:
+        elif i - w >= 0:
             i_ = np.arange(i - w, i + w + 1)
-
+        else:
+            i_ = np.arange(i, i + w)
     return i_
 
 
 def neighbours_indices(shape, I, mode='vec', window=3):
     n = len(shape)
     w = window / 2
-    print('shape in indices',shape)
+
     indices = vec_to_matrix_indices(I, shape)
-    print('ind', indices)
+
     bounds = [create_arange(i=indices[i], l=shape[i], w=w) for i in range(n)]
 
     idx = list(itertools.product(*bounds))

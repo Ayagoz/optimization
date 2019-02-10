@@ -104,9 +104,9 @@ def create_arange(i, l, w=2):
 def neighbours_indices(shape, I, mode='vec', window=3):
     n = len(shape)
     w = window / 2
-
+    print('shape in indices',shape)
     indices = vec_to_matrix_indices(I, shape)
-
+    print('ind', indices)
     bounds = [create_arange(i=indices[i], l=shape[i], w=w) for i in range(n)]
 
     idx = list(itertools.product(*bounds))
@@ -253,10 +253,12 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad, param_der):
     else:
         T = 0
     cols = neighbours_indices(shape, I, 'vec', window)
+
     rows = np.repeat(I, len(cols))
 
     print('shape', shape)
-    print('i',(T, ax,) + tuple(vec_to_matrix_indices(I, shape)))
+    print('cols', cols)
+    print('i', (T, ax,) + tuple(vec_to_matrix_indices(I, shape)))
     print('j', [(T, ax,) + tuple(vec_to_matrix_indices(j, shape)) for j in cols])
     derivative_func = import_func(**param_der)
     data = np.array([

@@ -85,27 +85,12 @@ def vec_to_matrix_indices(I, shape):
 
 
 def create_arange(i, l, w=2):
-    if i == 0:
-        i_ = np.arange(i, i + w + 1)
-
-    elif i == l:
-        i_ = np.arange(i - w, l)
-
-    else:
-        if i + w >= l:
-            i_ = np.arange(i - w, l)
-
-        elif i - w >= 0:
-            i_ = np.arange(i - w, i + w + 1)
-        else:
-            i_ = np.arange(i, i + w)
-    return i_
+    return np.arange(max(i - w, 0), min(i + w + 1, l), 1)
 
 
 def neighbours_indices(shape, I, mode='vec', window=3):
     n = len(shape)
-    w = window / 2
-
+    w = int(window // 2)
     indices = vec_to_matrix_indices(I, shape)
 
     bounds = [create_arange(i=indices[i], l=shape[i], w=w) for i in range(n)]
@@ -229,12 +214,12 @@ def second_derivative_by_loss(vf, i, j, epsilon, moving, template, similarity, r
     elif i != j:
         return second_derivative_ij(vf=vf, i=i, j=j, epsilon=epsilon, moving=moving, template=template,
                                     sigma=similarity.varience, regularizer=regularizer,
-                                    n_steps=n_steps,inverse=inverse)
+                                    n_steps=n_steps, inverse=inverse)
     else:
         raise TypeError('you should give correct indices')
 
 
-def grad_of_derivative(vf, i, j, epsilon, moving, template,  similarity, regularizer, n_steps, inverse):
+def grad_of_derivative(vf, i, j, epsilon, moving, template, similarity, regularizer, n_steps, inverse):
     vf_forward = vf.copy()
     vf_forward[j] += epsilon
     vf_backward = vf.copy()
@@ -254,13 +239,12 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad, param_der):
     else:
         T = 0
     cols = neighbours_indices(shape, I, 'vec', window)
-
     rows = np.repeat(I, len(cols))
-
     print('shape', shape)
-    print('cols', cols)
-    print('i', (T, ax,) + tuple(vec_to_matrix_indices(I, shape)))
+    print('cols vec ', cols)
+    print('i', vec_to_matrix_indices(I, shape))
     print('j', [(T, ax,) + tuple(vec_to_matrix_indices(j, shape)) for j in cols])
+
     derivative_func = import_func(**param_der)
     data = np.array([
         derivative_func(i=(T, ax,) + tuple(vec_to_matrix_indices(I, shape)),
@@ -275,7 +259,7 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad, param_der):
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad,  param_der):
+def sparse_dot_product_forward(vector, ndim, mat_shape, window, params_grad, param_der):
     mat_len = int(np.prod(mat_shape))
     #
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
@@ -301,9 +285,9 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, window, params_grad, pa
 
     loc_res = Parallel(n_jobs=n_jobs, temp_folder=path_joblib)(
         delayed(one_line_sparse)(
-            vector, ndim, I, mat_shape, window, ax, params_grad,  param_der
+            vector, ndim, I, mat_shape, window, ax, params_grad, param_der
         )
-        for I in range(mat_len) for ax in range(ndim)
+        for ax in range(ndim) for I in range(mat_len)
     )
 
     gc.collect()

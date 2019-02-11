@@ -31,6 +31,7 @@
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/similarity/zncc.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../image_registration/rtk/validate.py" beforeDir="false" afterPath="$PROJECT_DIR$/../image_registration/rtk/validate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/RegOptim/optimization/template_utils.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -41,47 +42,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="375">
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RegOptim/optimization/derivatives.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3288">
-              <caret line="148" column="16" selection-start-line="148" selection-start-column="16" selection-end-line="148" selection-end-column="16" />
-              <folding>
-                <element signature="e#0#37#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RegOptim/optimization/pipeline.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1968">
-              <caret line="96" column="70" selection-start-line="96" selection-start-column="70" selection-end-line="96" selection-end-column="70" />
-              <folding>
-                <element signature="e#0#11#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/RegOptim/experiment_configs/experiment_loop.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="648">
-              <caret line="41" column="35" selection-start-line="41" selection-start-column="35" selection-end-line="41" selection-end-column="54" />
-              <folding>
-                <element signature="e#0#37#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/RegOptim/optimization/template_utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="281">
-              <caret line="259" column="9" selection-start-line="259" selection-start-column="4" selection-end-line="259" selection-end-column="9" />
+            <state relative-caret-position="629">
+              <caret line="274" column="16" lean-forward="true" selection-start-line="274" selection-start-column="16" selection-end-line="274" selection-end-column="16" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -148,6 +113,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -191,7 +157,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -232,12 +197,13 @@
       <workItem from="1549653347846" duration="161000" />
       <workItem from="1549695253995" duration="599000" />
       <workItem from="1549726408301" duration="6303000" />
-      <workItem from="1549796601103" duration="1515000" />
+      <workItem from="1549796601103" duration="2124000" />
+      <workItem from="1549886961631" duration="3507000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="31525000" />
+    <option name="totallyTimeSpent" value="35641000" />
   </component>
   <component name="TodoView" selected-index="2">
     <todo-panel id="selected-file">
@@ -252,7 +218,7 @@
     <frame x="68" y="-8" width="1853" height="1089" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.18656301" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.188784" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -609,8 +575,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/RegOptim/optimization/derivatives.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3288">
-          <caret line="148" column="16" selection-start-line="148" selection-start-column="16" selection-end-line="148" selection-end-column="16" />
+        <state relative-caret-position="1175">
+          <caret line="146" column="20" lean-forward="true" selection-start-line="146" selection-start-column="20" selection-end-line="146" selection-end-column="20" />
           <folding>
             <element signature="e#0#37#0" expanded="true" />
           </folding>
@@ -619,7 +585,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/RegOptim/optimization/pipeline.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1968">
+        <state relative-caret-position="833">
           <caret line="96" column="70" selection-start-line="96" selection-start-column="70" selection-end-line="96" selection-end-column="70" />
           <folding>
             <element signature="e#0#11#0" expanded="true" />
@@ -639,8 +605,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/RegOptim/optimization/template_utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="281">
-          <caret line="259" column="9" selection-start-line="259" selection-start-column="4" selection-end-line="259" selection-end-column="9" />
+        <state relative-caret-position="629">
+          <caret line="274" column="16" lean-forward="true" selection-start-line="274" selection-start-column="16" selection-end-line="274" selection-end-column="16" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>

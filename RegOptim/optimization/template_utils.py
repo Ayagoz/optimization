@@ -208,12 +208,12 @@ def second_derivative_by_loss(vf, i, j, epsilon, moving, template, similarity, r
 
     if i == j:
         return second_derivative_ii(vf=vf, i=i, epsilon=epsilon, moving=moving, template=template,
-                                    sigma=similarity.varience, regularizer=regularizer,
+                                    sigma=similarity.variance, regularizer=regularizer,
                                     n_steps=n_steps, inverse=inverse)
 
     elif i != j:
         return second_derivative_ij(vf=vf, i=i, j=j, epsilon=epsilon, moving=moving, template=template,
-                                    sigma=similarity.varience, regularizer=regularizer,
+                                    sigma=similarity.variance, regularizer=regularizer,
                                     n_steps=n_steps, inverse=inverse)
     else:
         raise TypeError('you should give correct indices')
@@ -253,7 +253,7 @@ def one_line_sparse(vector, ndim, I, shape, window, ax, params_grad, param_der):
                         )
         for j in cols
     ])
-
+    print('data', data)
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)

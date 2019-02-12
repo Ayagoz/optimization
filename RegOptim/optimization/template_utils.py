@@ -233,7 +233,7 @@ def second_derivative_by_loss(vf, i, j, loss, epsilon, moving, template, similar
         raise TypeError('you should give correct indices')
 
 
-def grad_of_derivative(vf, i, j, loss, epsilon, moving, template, similarity, regularizer, n_steps, inverse):
+def grad_of_derivative(vf, i, j, epsilon, moving, template, similarity, regularizer, n_steps, inverse, loss=None):
     vf_forward = vf.copy()
     vf_forward[j] += epsilon
     vf_backward = vf.copy()
@@ -256,6 +256,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
     rows = np.repeat(I, len(cols))
 
     derivative_func = import_func(**param_der)
+
     data = np.array([
         derivative_func(i=(T, ax,) + tuple(vec_to_matrix_indices(I, shape)),
                         j=(T, ax,) + tuple(vec_to_matrix_indices(j, shape)),
@@ -263,7 +264,9 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
                         )
         for j in cols
     ])
-
+    print('rows',rows)
+    print('cols', cols)
+    print('data', data)
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)

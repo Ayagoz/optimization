@@ -3,7 +3,6 @@ from __future__ import print_function
 import copy
 
 import numpy as np
-from memory_profiler import profile
 
 import rtk
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, \
@@ -112,7 +111,6 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
-@profile
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
                             similarity, regularizer, inverse, n_jobs, params_der, window=3):
     _, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
@@ -145,7 +143,11 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
                    'similarity': similarity, 'regularizer': regularizer,
 
                    }
-    loss = loss_func(**params_grad)
+    loss = loss_func(vf=vf_all_in_one_resolution,
+                     moving=tmp2, template=tmp1,
+                     n_steps=n_steps, shape=template.shape,
+                     regularizer=regularizer, sigma=similarity.variance,
+                     inverse=inverse)
 
     dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution, ndim=template.ndim, loss=loss,
                                mat_shape=template.shape, window=window, params_grad=params_grad,

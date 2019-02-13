@@ -127,7 +127,7 @@ def get_contour2D(image, contour_color=150, width=3, mask=True):
     t = find_threshold_gray_scale(imgray)
     ret, thresh = cv2.threshold(imgray, t, 255, 0)
     thresh = thresh.astype(np.uint8)
-    im2, contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     if mask:
         if image.ndim == 3:

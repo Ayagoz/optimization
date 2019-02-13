@@ -28,7 +28,7 @@ def Lv(A, v):
     for i in range(len(v)):
         Dv[i] = np.real(ifftn(Lv[i]))
 
-    return Dv
+    return np.real(Dv)
 
 
 def get_der_dLv(A, v, a, b):
@@ -153,7 +153,7 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     else:
         T = 0
 
-    grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
+    grad_v = np.squeeze([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
                                   vector_field=vf[T], regularizer=regularizer, learning_rate=1.) + \
                        Lv(regularizer.A, vf)
@@ -244,6 +244,8 @@ def grad_of_derivative(vf, i, j, epsilon, moving, template, similarity, regulari
     grad_backward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_backward,
                                                similarity=similarity, regularizer=regularizer, inverse=inverse)
 
+
+
     return ((grad_forward - grad_backward) / (2 * epsilon))[i]
 
 
@@ -264,9 +266,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
                         )
         for j in cols
     ])
-    print('rows',rows)
-    print('cols', cols)
-    print('data', data)
+
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)

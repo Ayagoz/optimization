@@ -40,7 +40,8 @@ def create_kwargs(params, data, template, a, b, idx_out_train, optim_template, a
     kwargs['add_padding'] = add_padding
     kwargs['pad_size'] = pad_size
     kwargs['params_der'] = params['derivative_J_params']
-
+    print('in kwargs')
+    print(kwargs['pad_size'])
     return kwargs
 
 
@@ -81,8 +82,9 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
                 pipeline_params, template_name, path_to_template, pad_size, it
             )
+            print('after temp step in main loop', pad_size)
             if add_padding:
-                pad_size += pipeline_params['pipeline_optimization_params']['pad_size']
+                print('in add padding true', pad_size)
                 pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
 
         else:
@@ -90,6 +92,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
                 pipeline_params, pad_size
             )
+
 
         adam_grad_da, mta, vta = adam_step(grads_da, mta, vta, it)
         adam_grad_db, mtb, vtb = adam_step(grads_db, mtb, vtb, it)
@@ -121,6 +124,8 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
                            pipeline_params, template_name, path_to_template,
                            pad_size, it):
+
+    print('in templ step', pad_size)
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_template = import_func(**pipeline_params['count_grads_template'])
 
@@ -170,7 +175,7 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
         pad_size += reg['pad_size']
 
     gc.collect()
-
+    print('in the end of temp step', pad_size)
     return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size
 
 
@@ -179,7 +184,7 @@ def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_a_b = import_func(**pipeline_params['count_grads_a_b'])
     reg = pipeline_params['pipeline_optimization_params']
-
+    print('in a&b step', pad_size)
     y_out_train = y[idx_out_train]
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, False,
                            reg['add_padding'], pad_size)
@@ -203,5 +208,6 @@ def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,
     )
 
     gc.collect()
+    print('in the end of a&b step', pad_size)
 
     return best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss

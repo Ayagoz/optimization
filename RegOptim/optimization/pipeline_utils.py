@@ -96,7 +96,7 @@ def pad_template_data_after_loop(template, path_to_template, pad_size=2, save=Tr
     return padded_template
 
 
-def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3):
+def preprocess_delta_template(delta, axis=0, contour_color=150, width=4, ndim=3):
     bin_delta = binarize(delta, find_threshold_gray_scale(delta))
 
     if ndim == 3:
@@ -108,6 +108,6 @@ def preprocess_delta_template(delta, axis=0, contour_color=150, width=1, ndim=3)
     else:
         raise TypeError('Do not support images of ndim not equal 2 or 3')
 
-    filled_contour = get_outside_filled(bin_delta, contour_delta)
+    #filled_contour = get_outside_filled(bin_delta, contour_delta)
 
-    return delta * filled_contour
+    return delta * contour_delta

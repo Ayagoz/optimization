@@ -78,7 +78,7 @@ def one_to_one(data1, data2, **kwargs):
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
     if data1.shape != data2.shape:
-        raise TypeError(data1.shape + '!=' + data2.shape, 'wrong shapes?>.<')
+        raise TypeError(str(data1.shape) + '!=' + str(data2.shape), 'data shape != template shape')
     if kwargs['inverse']:
         # first image = fixed, second = moving
         reg.set_images(rtk.ScalarImage(data=data2), rtk.ScalarImage(data=data1))

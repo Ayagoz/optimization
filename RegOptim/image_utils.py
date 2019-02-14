@@ -113,7 +113,7 @@ def find_threshold_gray_scale(img):
         return x[len(x) // 2 + 1]
 
 
-def get_outside_filled(imgray, mask_contour, t=0.):
+def get_outside_filled(imgray, mask_contour, t=0):
     mask_img = binarize(imgray, find_threshold_gray_scale(imgray))
     return binarize(np.ones_like(mask_img) - mask_img + mask_contour, t)
 

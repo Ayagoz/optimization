@@ -77,13 +77,14 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
         print('For params a {} and b {}'.format(a_it[-1], b_it[-1]))
 
         if optim_template:
-            template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding = optimize_template_step(
+            template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size = optimize_template_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
                 pipeline_params, template_name, path_to_template, pad_size, it
             )
             if add_padding:
                 pad_size += pipeline_params['pipeline_optimization_params']['pad_size']
                 pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
+
         else:
             best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss = optimize_a_b_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
@@ -164,11 +165,13 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
                                                 os.path.join(path_to_template, template_name),
                                                 pad_size=reg['pad_size'], ndim=pipeline_params['ndim'])
 
+
         add_padding = True
+        pad_size += reg['pad_size']
 
     gc.collect()
 
-    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding
+    return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size
 
 
 def optimize_a_b_step(data, template, y, a, b, idx_out_train, idx_out_test,

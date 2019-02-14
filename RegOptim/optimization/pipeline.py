@@ -71,12 +71,14 @@ def one_to_one(data1, data2, **kwargs):
     if kwargs['add_padding']:
         # should be add by all iterations! (if two times!! fix it by add pad size!)
         data1 = padding(data1, ndim=data1.ndim, pad_size=kwargs['pad_size'], mode='edge')
+
     kwargs['shape'] = data1.shape
     kwargs['ndim'] = data1.ndim
 
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
-
+    if data1.shape != data2.shape:
+        raise TypeError(data1.shape + '!=' + data2.shape, 'wrong shapes?>.<')
     if kwargs['inverse']:
         # first image = fixed, second = moving
         reg.set_images(rtk.ScalarImage(data=data2), rtk.ScalarImage(data=data1))

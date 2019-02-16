@@ -1,5 +1,6 @@
 import gc
 import itertools
+import time
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -153,13 +154,14 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     else:
         T = 0
 
-    grad_v = np.squeeze([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
+    grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
                                   vector_field=vf[T], regularizer=regularizer, learning_rate=1.) + \
-                       Lv(regularizer.A, vf)
+                        regularizer.A
                        ])
 
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
+
 
 
 def intergal_of_action(vf, regularizer, n_steps):
@@ -170,7 +172,7 @@ def intergal_of_action(vf, regularizer, n_steps):
 def loss_func(vf, moving, template, sigma, regularizer, n_steps, shape, inverse):
     deformation = deformation_grad(vf, n_steps, shape)
     deformed_moving, _ = deformation_applied(moving, template, n_steps, deformation, inverse)
-
+    #TODO: rewrite tot optimize computing integral of action, can be stored(can count just the last one time step)
     loss = np.sum((deformed_moving[-1] - template) ** 2) / float(sigma) + intergal_of_action(vf, regularizer, n_steps)
 
     return loss
@@ -258,7 +260,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
     rows = np.repeat(I, len(cols))
 
     derivative_func = import_func(**param_der)
-
+    st = time.time()
     data = np.array([
         derivative_func(i=(T, ax,) + tuple(vec_to_matrix_indices(I, shape)),
                         j=(T, ax,) + tuple(vec_to_matrix_indices(j, shape)),
@@ -266,7 +268,8 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
                         )
         for j in cols
     ])
-
+    print('time', time.time() - st)
+    print('data', data)
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)

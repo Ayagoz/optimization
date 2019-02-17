@@ -36,7 +36,7 @@ def metric_learning_to_template(PATH):
     load_data = import_func(**pipeline_params['load_func'])
     data, y = load_data(**pipeline_params['load_params'])
 
-    if isinstance(data[0],(str, np.unicode, np.str, np.basestring)):
+    if isinstance(data[0],(str, np.unicode, np.str, np.string_, np.unicode_)):
         np.savez(os.path.join(experiment_path, 'data_path.npz'), np.array(data))
 
     np.savez(os.path.join(experiment_path, 'target.npz'), y)

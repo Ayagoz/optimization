@@ -8,7 +8,7 @@ from RegOptim.utils import load_nii, balanced_fold
 
 def load_data_from_one_dir(path_to_data, file_type, target_type):
     data, target = [], []
-    subj = os.listdir(path_to_data)
+    subj = sorted(os.listdir(path_to_data))
 
     for subj in tqdm(subj, desc='loading subjects'):
         for k, i in target_type.items():
@@ -27,7 +27,7 @@ def load_data_from_one_dir(path_to_data, file_type, target_type):
 def load_data_from_dirs(path_to_data, data_type, file_type):
     data = []
     subj_names = []
-    path = os.listdir(path_to_data)
+    path = sorted(os.listdir(path_to_data))
 
     for subj in tqdm(path, desc='loading subjects'):
         path_to_subj = os.path.join(os.path.join(path_to_data, subj), 'nii')
@@ -69,7 +69,7 @@ def load_target(path, idx, target_type):
     return np.array(target)
 
 
-def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, balanced=True):
+def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, balanced=True, save=True):
     '''
     :param path_to_data:
     :param balanced:
@@ -84,9 +84,14 @@ def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, bal
     assert file_type is not None and path_to_meta is not None, 'provide target path'
     if file_type == 'nii' or file_type == 'path':
         data, names = load_data_from_nii(path_to_data, data_type, file_type)
+        if save:
+            np.savez(os.path.join(path_to_data,'data_idx.npz'), names)
         target = load_target(path_to_meta, names, target_type)
+
         if balanced:
             idx = balanced_fold(target)
+            if save:
+                np.savez(os.path.join(path_to_data, 'data_idx.npz'), names[idx])
             return data[np.ix_(idx)], target[np.ix_(idx)]
         return data, target
 

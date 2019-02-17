@@ -1,6 +1,6 @@
 import gc
 import itertools
-import time
+
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -260,7 +260,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
     rows = np.repeat(I, len(cols))
 
     derivative_func = import_func(**param_der)
-    st = time.time()
+
     data = np.array([
         derivative_func(i=(T, ax,) + tuple(vec_to_matrix_indices(I, shape)),
                         j=(T, ax,) + tuple(vec_to_matrix_indices(j, shape)),
@@ -268,8 +268,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
                         )
         for j in cols
     ])
-    print('time', time.time() - st)
-    print('data', data)
+
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
     return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)

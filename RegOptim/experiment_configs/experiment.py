@@ -36,6 +36,11 @@ def metric_learning_to_template(PATH):
     load_data = import_func(**pipeline_params['load_func'])
     data, y = load_data(**pipeline_params['load_params'])
 
+    if isinstance(data[0],(str, np.unicode, np.str, np.basestring)):
+        np.savez(os.path.join(experiment_path, 'data_path.npz'), np.array(data))
+
+    np.savez(os.path.join(experiment_path, 'target.npz'), y)
+
     if pipeline_params['subset'] is not None:
         data, y = get_subset(data, y, pipeline_params['subset'], pipeline_params['random_state'])
 

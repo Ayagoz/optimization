@@ -67,7 +67,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
     else:
         results = pd.DataFrame(columns=["iter", "a", "b", "LR C ", "train_score", "train_loss",
                                         "test_score", "test_loss", "one_loop_time", "pad_size"])
-    print('before while', pad_size)
+
     while (abs(a_it[-1] - a_it[-2]) + abs(b_it[-1] - b_it[-2])) > 1e-10 or \
             it > pipeline_params['Number_of_iterations']:
 
@@ -75,14 +75,13 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 
         print('For iter {}'.format(int(it)))
         print('For params a {} and b {}'.format(a_it[-1], b_it[-1]))
-        print('in loop', pad_size)
+
         if optim_template:
 
             template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size = optimize_template_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
                 pipeline_params, template_name, path_to_template, pad_size, it
             )
-            print('after template iter', pad_size)
             if add_padding:
                 pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
 
@@ -134,6 +133,9 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
     K, da, db, dJ = count_dist_matrix_to_template(**kwargs)
 
+    K_path = os.path.join(os.path.join(pipeline_params['path_to_exp'], pipeline_params['experiment_name']), 'kernel')
+    np.savez(os.path.join(K_path, 'kernel_' + str(it) + '.npz'), K)
+
     K_out_train = K[np.ix_(idx_out_train, idx_out_train)]
 
     best_params = find_pipeline_params(
@@ -168,7 +170,6 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
 
         add_padding = True
         pad_size += reg['pad_size']
-        print('after check template new pad size', pad_size)
 
     gc.collect()
     return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size

@@ -274,7 +274,8 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
     cols = neighbours_indices(shape, I, 'vec', window)
     cols = check_cols(cols, I, ind)
 
-    ind.update([(j, I) for j in cols])
+    ind = np.concatenate([ind, [(j, I) for j in cols]])
+    
     rows = np.repeat(I, len(cols))
 
     derivative_func = import_func(**param_der)

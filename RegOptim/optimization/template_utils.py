@@ -1,7 +1,6 @@
 import gc
 import itertools
 
-
 import numpy as np
 from joblib import Parallel, delayed
 from scipy.fftpack import fftn, ifftn
@@ -157,11 +156,10 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
     grad_v = np.array([derivative(similarity=similarity, fixed=template_imgs[- T - 1],
                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
                                   vector_field=vf[T], regularizer=regularizer, learning_rate=1.) + \
-                        regularizer.A
+                       regularizer.A
                        ])
 
     return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
-
 
 
 def intergal_of_action(vf, regularizer, n_steps):
@@ -172,13 +170,13 @@ def intergal_of_action(vf, regularizer, n_steps):
 def loss_func(vf, moving, template, sigma, regularizer, n_steps, shape, inverse):
     deformation = deformation_grad(vf, n_steps, shape)
     deformed_moving, _ = deformation_applied(moving, template, n_steps, deformation, inverse)
-    #TODO: rewrite tot optimize computing integral of action, can be stored(can count just the last one time step)
+    # TODO: rewrite tot optimize computing integral of action, can be stored(can count just the last one time step)
     loss = np.sum((deformed_moving[-1] - template) ** 2) / float(sigma) + intergal_of_action(vf, regularizer, n_steps)
 
     return loss
 
 
-def second_derivative_ii(vf, i, loss,  epsilon, moving, template, sigma, regularizer, n_steps, inverse):
+def second_derivative_ii(vf, i, loss, epsilon, moving, template, sigma, regularizer, n_steps, inverse):
     copy_vf = vf.copy()
     copy_vf[i] += epsilon
     loss_forward = loss_func(copy_vf, moving, template, sigma, regularizer, n_steps, template.shape, inverse)
@@ -188,6 +186,13 @@ def second_derivative_ii(vf, i, loss,  epsilon, moving, template, sigma, regular
 
     return (loss_forward - 2 * loss + loss_backward) / epsilon ** 2
 
+'''
+for i in np.ndindex(*v.shape):
+    for delta in itertools.product(range(-size, size+1), v.ndim):
+        j = tuple(np.array(i) + delta)
+        if i < j:
+            calculate
+'''
 
 def second_derivative_ij(vf, i, j, epsilon, moving, template, sigma, regularizer, n_steps, inverse):
     # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, y+e))/ (4*e^2) with precision O(h^2)
@@ -246,17 +251,30 @@ def grad_of_derivative(vf, i, j, epsilon, moving, template, similarity, regulari
     grad_backward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_backward,
                                                similarity=similarity, regularizer=regularizer, inverse=inverse)
 
-
-
     return ((grad_forward - grad_backward) / (2 * epsilon))[i]
 
 
-def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param_der):
+def check_cols(cols, I, ind):
+    cols = cols.tolist()
+
+    if len(ind) == 0:
+        return cols
+
+    for num, j in enumerate(cols):
+        if (j, I) in ind or (I, j) in ind:
+            cols.pop(num)
+    return np.array(cols)
+
+
+def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param_der, ind):
     if params_grad['inverse']:
         T = -1
     else:
         T = 0
     cols = neighbours_indices(shape, I, 'vec', window)
+    cols = check_cols(cols, I, ind)
+
+    ind.update([(j, I) for j in cols])
     rows = np.repeat(I, len(cols))
 
     derivative_func = import_func(**param_der)
@@ -271,7 +289,7 @@ def one_line_sparse(vector, ndim, I, shape, window, loss, ax, params_grad, param
 
     mat_shape = (ndim * np.prod(shape), ndim * np.prod(shape))
 
-    return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape)
+    return coo_matrix((data, (rows + ax * int(np.prod(shape)), cols + ax * int(np.prod(shape)))), shape=mat_shape), ind
 
 
 def sparse_dot_product_forward(vector, ndim, mat_shape, loss, window, params_grad, param_der):
@@ -280,12 +298,12 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, loss, window, params_gra
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
     result = coo_matrix((ndim * mat_len, ndim * mat_len))
-
+    ind = []
     for ax in range(ndim):
         for I in range(mat_len):
-            loc_res = one_line_sparse(vector=vector, ndim=ndim, I=I, shape=mat_shape,
-                                      window=window, ax=ax, loss=loss,
-                                      params_grad=params_grad, param_der=param_der)
+            loc_res, ind = one_line_sparse(vector=vector, ndim=ndim, I=I, shape=mat_shape,
+                                           window=window, ax=ax, loss=loss,
+                                           params_grad=params_grad, param_der=param_der, ind=ind)
             result += loc_res
 
     gc.collect()
@@ -303,7 +321,7 @@ def sparse_dot_product_parallel(vector, ndim, mat_shape, loss, window, params_gr
         delayed(one_line_sparse)(
             vector=vector, ndim=ndim, I=I, shape=mat_shape,
             loss=loss, window=window, ax=ax, params_grad=params_grad,
-            param_der=param_der
+            param_der=param_der, ind=[]
         )
         for ax in range(ndim) for I in range(mat_len)
     )

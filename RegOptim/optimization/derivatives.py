@@ -113,8 +113,9 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
                             similarity, regularizer, inverse, n_jobs, params_der, window=3):
+    print ('inv ', False)
     grad, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
-                                              similarity, regularizer, inverse)
+                                              similarity, regularizer, False)
 
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape

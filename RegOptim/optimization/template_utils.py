@@ -146,14 +146,15 @@ def deformation_applied(moving, template, n_steps, deformation, inverse):
 def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse):
     deformation = deformation_grad(vf, n_steps, template.shape)
 
-    moving_imgs, _ = deformation_applied(moving, template, n_steps, deformation, inverse)
+    moving_imgs, template_img = deformation_applied(moving, template, n_steps, deformation, inverse)
 
     if inverse:
         T = -1
     else:
         T = 0
 
-    grad_v = np.array([derivative(similarity=similarity, fixed=template,
+
+    grad_v = np.array([derivative(similarity=similarity, fixed=template_img[-T-1],
                                   moving=moving_imgs[T], Dphi=deformation.backward_dets[- T - 1],
                                   vector_field=vf[T], regularizer=regularizer, learning_rate=1.) + \
                        regularizer.A

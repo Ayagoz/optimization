@@ -28,7 +28,7 @@ def derivatives_of_pipeline_without_template(result, n_total):
 def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape):
     n_train = len(train_idx)
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
-    shape = np.array(Lvfs).shape[2:]
+
     ndim = len(shape)
 
     # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
@@ -38,7 +38,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
     metric = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1].copy(), dv_dJ[idx2].copy(), ndim, shape=shape_res)
                        for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
                        for idx2 in train_idx[i:]])
-    dJ = np.zeros((n_train, n_train) + shape)
+    dJ = np.zeros((n_train, n_train) + img_shape)
 
     i, j = np.triu_indices(n_train, 0)
     k, l = np.tril_indices(n_train, 0)
@@ -78,7 +78,16 @@ def one_to_one(data1, data2, **kwargs):
     # inverse means that we would like to find path from X to template
     # it means that we would like to find vf[-1] ~ vf^(-1)[0]
     if data1.shape != data2.shape:
-        raise TypeError(str(data1.shape) + '!=' + str(data2.shape), 'data shape != template shape')
+        if data1.shape < data2.shape:
+            pad_size = data2.shape[0] - data1.shape[0]
+            data1 = padding(data1, ndim = data1.ndim, pad_size=pad_size, mode='edge')
+            kwargs['pad_size'] += pad_size
+        elif data1.shape > data2.shape:
+            pad_size = data1.shape[0] - data2.shape[0]
+            data1 = padding(data2, ndim = data2.ndim, pad_size=pad_size, mode='edge')
+            kwargs['pad_size'] += pad_size
+        else:
+            raise TypeError(str(data1.shape) + '!=' + str(data2.shape), 'data shape != template shape')
 
     if kwargs['inverse']:
         # first image = fixed, second = moving
@@ -86,7 +95,7 @@ def one_to_one(data1, data2, **kwargs):
     else:
         reg.set_images(rtk.ScalarImage(data=data1), rtk.ScalarImage(data=data2))
 
-    reg.execute()
+    warp = reg.execute()
 
     # get resulting vector field in one resolution
     # if vf0=True, get (1, ndim, img_shape), else get (t, ndim, img_shape)

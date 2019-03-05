@@ -6,7 +6,7 @@ import numpy as np
 
 import rtk
 from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, \
-    full_derivative_by_v, get_der_dLv, loss_func
+    full_derivative_by_v, get_der_dLv, loss_func, Lv
 from RegOptim.preprocessing import to_one_resolution
 from rtk import gradient
 
@@ -87,7 +87,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     regularizer.set_operator(shape)
 
     # find Lv(t=1,ndim, img_shape)
-    Lvf = regularizer(in_one_res[0])[None]
+    Lvf = Lv(regularizer.A**2, in_one_res[0])[None]
     # get derivatives of Lv
     Deltas_v = get_der_dLv(A=reg.As[-1], v=in_one_res, a=a, b=b)
     dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
@@ -113,7 +113,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
 
 def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
                             similarity, regularizer, inverse, n_jobs, params_der, window=3):
-    _, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
+    grad, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
                                               similarity, regularizer, inverse)
 
     # get I composed with phi
@@ -151,10 +151,9 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
 
     dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution, ndim=template.ndim, loss=loss,
                                mat_shape=template.shape, window=window, params_grad=params_grad,
-                               mode='parallel', param_der=params_der, n_jobs=n_jobs, path=joblib_path).dot(dl_dJ_dv)
-
-    del dl_dv, dl_dJ_dv
+                               mode='forward', param_der=params_der, n_jobs=n_jobs, path=joblib_path)#.dot(dl_dJ_dv)
+    #del dl_dv, dl_dJ_dv
 
     # gc.collect()
 
-    return [dv_dJ]
+    return [dv_dJ, dl_dJ_dv, grad]

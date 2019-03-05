@@ -115,7 +115,7 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
                             similarity, regularizer, inverse, n_jobs, params_der, window=3):
 
     grad, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
-                                              similarity, regularizer, False, sum=True)
+                                              similarity, regularizer, inverse)
 
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape

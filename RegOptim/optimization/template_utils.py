@@ -143,7 +143,7 @@ def deformation_applied(moving, template, n_steps, deformation, inverse):
     return moving_imgs, template_imgs
 
 
-def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse):
+def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer, inverse, sum=None):
     deformation = deformation_grad(vf, n_steps, template.shape)
 
     moving_imgs, template_img = deformation_applied(moving, template, n_steps, deformation, inverse)
@@ -152,6 +152,14 @@ def full_derivative_by_v(moving, template, n_steps, vf, similarity, regularizer,
         T = -1
     else:
         T = 0
+    if sum is not None:
+        grad_v = np.sum(np.array([derivative(similarity=similarity, fixed=template_img[-i - 1],
+                                      moving=moving_imgs[i], Dphi=deformation.backward_dets[- i - 1],
+                                      vector_field=vf[i], regularizer=regularizer, learning_rate=1.) + \
+                                      regularizer.A]
+                                 for i in range(n_steps + 1)), axis=0)/float(n_steps + 1)
+        return grad_v, deformation.backward_dets[-T-1], moving_imgs[T]
+
 
 
     grad_v = np.array([derivative(similarity=similarity, fixed=template_img[-T-1],
@@ -344,9 +352,9 @@ def grad_of_derivative(vf, i, j, epsilon, moving, template, similarity, regulari
     vf_backward[j] += epsilon
 
     grad_forward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_forward,
-                                              similarity=similarity, regularizer=regularizer, inverse=inverse)
+                                              similarity=similarity, regularizer=regularizer, inverse=inverse, sum=None)
     grad_backward, _, _ = full_derivative_by_v(moving=moving, template=template, n_steps=n_steps, vf=vf_backward,
-                                               similarity=similarity, regularizer=regularizer, inverse=inverse)
+                                               similarity=similarity, regularizer=regularizer, inverse=inverse, sum=None)
 
     return ((grad_forward - grad_backward) / (2 * epsilon))[i]
 

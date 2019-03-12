@@ -29,7 +29,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
     n_train = len(train_idx)
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
 
-    ndim = len(shape)
+    ndim = len(img_shape)
 
     # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
 
@@ -95,14 +95,14 @@ def one_to_one(data1, data2, **kwargs):
     else:
         reg.set_images(rtk.ScalarImage(data=data1), rtk.ScalarImage(data=data2))
 
-    warp = reg.execute()
+    warp, deformation = reg.execute()
 
     # get resulting vector field in one resolution
     # if vf0=True, get (1, ndim, img_shape), else get (t, ndim, img_shape)
 
     if kwargs['pipe_template']:
         gc.collect()
-        return template_pipeline_derivatives(reg=reg, similarity=similarity, regularizer=regularizer,
+        return warp, deformation, template_pipeline_derivatives(reg=reg, similarity=similarity, regularizer=regularizer,
                                              data=data1, template=data2, a=a, b=b, epsilon=kwargs['epsilon'],
                                              shape=data1.shape, inverse=kwargs['inverse'],
                                              params_der=kwargs['params_der'], optim_template=kwargs['optim_template'],

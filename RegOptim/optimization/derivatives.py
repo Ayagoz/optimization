@@ -5,7 +5,7 @@ import copy
 import numpy as np
 
 import rtk
-from RegOptim.optimization.template_utils import sparse_dot_product, double_dev_J_v, \
+from RegOptim.optimization.template_utils import sparse_dot_product_forward, double_dev_J_v, \
     full_derivative_by_v, get_der_dLv, loss_func, Lv
 from RegOptim.preprocessing import to_one_resolution
 from rtk import gradient
@@ -87,7 +87,7 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
     regularizer.set_operator(shape)
 
     # find Lv(t=1,ndim, img_shape)
-    Lvf = Lv(regularizer.A**2, in_one_res[0])[None]
+    Lvf = Lv(regularizer.A ** 2, in_one_res[0])[None]
     # get derivatives of Lv
     Deltas_v = get_der_dLv(A=reg.As[-1], v=in_one_res, a=a, b=b)
     dLv_da, dLv_db = Deltas_v[0], Deltas_v[1]
@@ -99,28 +99,33 @@ def template_pipeline_derivatives(reg, similarity, regularizer, data, template, 
                                     template=template)
 
     if optim_template:
-        dv_dJ = get_derivative_template(data=data, template=template, n_steps=reg.n_step,
+        dv_dJ = get_derivative_template(data=data, template=template, reg=reg, n_steps=reg.n_step,
                                         vf_all_in_one_resolution=vf_all_in_one_res,
                                         similarity=similarity, regularizer=regularizer, params_der=params_der,
                                         inverse=inverse, epsilon=epsilon, n_jobs=n_jobs, window=window)
         # gc.collect()
-        return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
+        return vf_all_in_one_res, Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
 
     # gc.collect()
 
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
-def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, epsilon,
+def get_derivative_template(data, template, reg, n_steps, vf_all_in_one_resolution, epsilon,
                             similarity, regularizer, inverse, n_jobs, params_der, window=3):
-
-    grad, det, moving_img = full_derivative_by_v(data, template, n_steps, vf_all_in_one_resolution,
-                                              similarity, regularizer, inverse)
+    grad, _, moving_img = full_derivative_by_v(moving=data, template=template,
+                                               backward_dets=reg.deformation.backward_dets,
+                                               n_steps=n_steps, vf=vf_all_in_one_resolution,
+                                               similarity=similarity, regularizer=regularizer,
+                                               inverse=inverse)
 
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape
-
-    dl_dv = - 2. / similarity.variance * gradient(moving_img) * det
+    if inverse:
+        T = -1
+    else:
+        T = 0
+    dl_dv = - 2. / similarity.variance * gradient(moving_img) * reg.deformation.backward_dets[T]
 
     #     dl_dv = - similarity.derivative(moving_imgs.data[-1], template_img.data) * deformation.backward_dets[-1] #/ \
     # np.array(moving_imgs[-1] - template_img.data).astype(np.float)
@@ -132,29 +137,22 @@ def get_derivative_template(data, template, n_steps, vf_all_in_one_resolution, e
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
 
-    if inverse:
-        tmp2 = data.copy()
-        tmp1 = template.copy()
-    else:
-        tmp2 = template.copy()
-        tmp1 = data.copy()
-
-    params_grad = {'moving': tmp2, 'template': tmp1, 'epsilon': epsilon,
+    params_grad = {'moving': data, 'template': template, 'epsilon': epsilon,
                    'inverse': inverse, 'n_steps': n_steps,
                    'similarity': similarity, 'regularizer': regularizer,
 
                    }
     loss = loss_func(vf=vf_all_in_one_resolution,
-                     moving=tmp2, template=tmp1,
+                     moving=data, template=template,
                      n_steps=n_steps, shape=template.shape,
                      regularizer=regularizer, sigma=similarity.variance,
                      inverse=inverse)
 
-    dv_dJ = sparse_dot_product(vector=vf_all_in_one_resolution, ndim=template.ndim, loss=loss,
+    dv_dJ = sparse_dot_product_forward(vector=vf_all_in_one_resolution, ndim=template.ndim, loss=loss,
                                mat_shape=template.shape, window=window, params_grad=params_grad,
-                               mode='forward', param_der=params_der, n_jobs=n_jobs, path=joblib_path)#.dot(dl_dJ_dv)
-    #del dl_dv, dl_dJ_dv
+                            param_der=params_der)  # .dot(dl_dJ_dv)
+    # del dl_dv, dl_dJ_dv
 
     # gc.collect()
 
-    return [dv_dJ, dl_dJ_dv, grad]
+    return [dv_dJ, dl_dJ_dv]

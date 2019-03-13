@@ -14,7 +14,6 @@ def load_data_from_one_dir(path_to_data, file_type, target_type):
         for k, i in target_type.items():
             if k in subj:
                 target += [i]
-                target += [i]
 
         path_to_subj = os.path.join(path_to_data, subj)
         if file_type == 'nii':
@@ -22,7 +21,7 @@ def load_data_from_one_dir(path_to_data, file_type, target_type):
         if file_type == 'path':
             data += [path_to_subj]
     print('data shape {}, target shape {}'.format(np.array(data).shape, np.array(target).shape))
-    return np.array(data), np.array(target)
+    return np.squeeze(np.array(data)), np.squeeze(np.array(target))
 
 
 def load_data_from_dirs(path_to_data, data_type, file_type):

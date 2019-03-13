@@ -58,6 +58,7 @@ def save_nii(image, path, name=None):
 
 
 def get_subset(X, y, size=0.5, random_state=0):
+    assert X.shape[0] == y.shape[0], 'WTF'
     idx_train, idx_test = list(StratifiedShuffleSplit(n_splits=1, random_state=random_state,
                                                       test_size=1-size).split(range(len(X)), y))[0]
     return X[np.ix_(idx_train)], y[np.ix_(idx_train)]

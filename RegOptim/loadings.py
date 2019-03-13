@@ -14,6 +14,7 @@ def load_data_from_one_dir(path_to_data, file_type, target_type):
         for k, i in target_type.items():
             if k in subj:
                 target += [i]
+                target += [i]
 
         path_to_subj = os.path.join(path_to_data, subj)
         if file_type == 'nii':
@@ -69,7 +70,7 @@ def load_target(path, idx, target_type):
     return np.array(target)
 
 
-def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, balanced=True, save=True):
+def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, path_to_exp, balanced=True, save=True):
     '''
     :param path_to_data:
     :param balanced:
@@ -83,7 +84,7 @@ def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, bal
     '''
     assert file_type is not None and path_to_meta is not None, 'provide target path'
     if file_type == 'nii' or file_type == 'path':
-        data, names = load_data_from_nii(path_to_data, data_type, file_type)
+        data, names = load_data_from_nii(path_to_exp, data_type, file_type)
         if save:
             np.savez(os.path.join(path_to_data,'data_idx.npz'), names)
         target = load_target(path_to_meta, names, target_type)
@@ -91,7 +92,7 @@ def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, bal
         if balanced:
             idx = balanced_fold(target)
             if save:
-                np.savez(os.path.join(path_to_data, 'data_idx.npz'), names[idx])
+                np.savez(os.path.join(path_to_exp, 'data_idx.npz'), names[idx])
             return data[np.ix_(idx)], target[np.ix_(idx)]
         return data, target
 

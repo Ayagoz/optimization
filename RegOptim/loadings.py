@@ -92,7 +92,7 @@ def load_data(path_to_data, file_type, target_type, data_type, path_to_meta, pat
         if balanced:
             idx = balanced_fold(target)
             if save:
-                np.savez(os.path.join(path_to_exp, 'data_idx.npz'), names[idx])
+                np.savez(os.path.join(path_to_data, 'data_idx.npz'), names[idx])
             return data[np.ix_(idx)], target[np.ix_(idx)]
         return data, target
 

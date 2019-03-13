@@ -11,7 +11,6 @@ from RegOptim.preprocessing import to_one_resolution
 from rtk import gradient, Deformation
 import matplotlib.pyplot as plt
 
-
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
 
@@ -77,7 +76,6 @@ def pairwise_pipeline_derivatives(reg, inverse):
 def template_pipeline_derivatives(reg, regularizer, data, template, a, b,
                                   epsilon, shape, inverse, optim_template, params_der,
                                   window, ):
-
     if inverse:
         T = 0
     else:
@@ -118,21 +116,18 @@ def get_derivative_template(reg, epsilon, params_der, window, T):
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape
 
-    fixed = copy.deepcopy(reg.fixed)
-    warp_fixed = np.copy(fixed.apply_transform(Deformation(grid=reg.deformation.backward_mappings[-1])).data)
+    moving = copy.deepcopy(reg.moving)
+    warp_fixed = np.copy(moving.apply_transform(Deformation(grid=reg.deformation.forward_mappings[-1]), order=3).data)
 
     # plt.imshow(warp_fixed.data)
     # plt.title('in dJ')
     # plt.show()
 
-
-    dl_dv = - 2. / reg.similarity.variance * gradient(warp_fixed) * reg.deformation.backward_dets[-1]
-
+    dl_dv = - 2. / reg.similarity.variance * gradient(warp_fixed) * reg.deformation.forward_dets[-1]
 
     # (t=1, ndim, img_shape)-for v and (img_shape,)- for template img J
 
     dl_dJ_dv = double_dev_J_v(dl_dv)
-
 
     params_grad = {'reg': copy.deepcopy(reg), 'epsilon': epsilon,
                    'deformation': copy.deepcopy(reg.old_deformation)
@@ -145,9 +140,9 @@ def get_derivative_template(reg, epsilon, params_der, window, T):
     dv_dJ = sparse_dot_product_forward(vector=np.copy(reg.resulting_vector_fields[-1].vector_fields),
                                        ndim=len(reg.fixed.shape), loss=loss, T=T,
                                        mat_shape=reg.fixed.shape, window=window, params_grad=params_grad,
-                                       param_der=params_der)  # .dot(dl_dJ_dv)
+                                       param_der=params_der).dot(dl_dJ_dv)
     # del dl_dv, dl_dJ_dv
 
     # gc.collect()
 
-    return [dv_dJ, dl_dJ_dv]
+    return dv_dJ

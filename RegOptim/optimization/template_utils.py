@@ -137,6 +137,93 @@ def deformation_grad(vf, n_steps, shape):
     return deformation
 
 
+def gradient(reg, deformation, vf=None):
+    if vf is not None:
+        deformation = deformation_grad(vf=vf, n_steps=reg.n_steps, shape=reg.moving.shape)
+    moving = copy.deepcopy(reg.moving)
+    warp_moving = np.copy(moving.apply_transform(Deformation(grid=deformation.forward_mappings[-1]), order=3).data)
+
+    grad = reg.regularizer(reg.similarity.derivative(reg.fixed.data, warp_moving) * deformation.forward_dets[-1])
+    return grad
+
+
+def grad_of_derivative_ii(vf, i, epsilon, reg, deformation):
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
+
+    vf1[i] += epsilon
+    vf2[i] -= epsilon
+    vf3[i] += 2 * epsilon
+    vf4[i] -= 2 * epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    grad_f1 = gradient(reg=copy.deepcopy(reg), deformation=def1)
+    grad_b1 = gradient(reg=copy.deepcopy(reg), deformation=def2)
+    grad_f2 = gradient(reg=copy.deepcopy(reg), deformation=def3)
+    grad_b2 = gradient(reg=copy.deepcopy(reg), deformation=def4)
+    ind = i[1:]
+    res = -grad_f2[ind] + 8 * grad_f1[ind] - 8 * grad_b1[ind] + grad_b2[ind]
+    print('ii in grad der ', res)
+    return res / (12 * epsilon)
+
+
+def grad_of_derivative_ij(vf, i, j, epsilon, reg, deformation):
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
+
+    vf1[j] += epsilon
+    vf2[j] -= epsilon
+    vf3[j] += 2 * epsilon
+    vf4[j] -= 2 * epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    grad_f1 = gradient(reg=copy.deepcopy(reg), deformation=def1)
+    grad_b1 = gradient(reg=copy.deepcopy(reg), deformation=def2)
+    grad_f2 = gradient(reg=copy.deepcopy(reg), deformation=def3)
+    grad_b2 = gradient(reg=copy.deepcopy(reg), deformation=def4)
+    ind = i[1:]
+    res = -grad_f2[ind] + 8 * grad_f1[ind] - 8 * grad_b1[ind] + grad_b2[ind]
+    print('ii in grad der ', res)
+
+    return res / (12 * epsilon)
+
+
+def grad_of_derivative(vf, i, j, epsilon, reg, deformation, loss=None):
+    assert len(vf.shape) == len(i) == len(j), "Not correct indices"
+
+    if i == j:
+        return grad_of_derivative_ii(vf=np.copy(vf), i=i, epsilon=epsilon, reg=copy.deepcopy(reg),
+                                     deformation=copy.deepcopy(deformation))
+
+    elif i != j:
+        return grad_of_derivative_ij(vf=np.copy(vf), i=i, j=j, epsilon=epsilon,
+                                     reg=copy.deepcopy(reg), deformation=copy.deepcopy(deformation))
+    else:
+        raise TypeError('you should give correct indices')
+
+
 def loss_func(reg, deformation, vf=None, show=False):
     if vf is not None:
         deformation = deformation_grad(vf=vf, n_steps=reg.n_steps, shape=reg.moving.shape)
@@ -145,7 +232,7 @@ def loss_func(reg, deformation, vf=None, show=False):
     warp_moving = np.copy(moving.apply_transform(Deformation(grid=deformation.forward_mappings[-1]), order=3).data)
 
     if show:
-        f, ax = plt.subplots(2,figsize=(10,10))
+        f, ax = plt.subplots(2, figsize=(10, 10))
         ax[0].imshow(moving)
         ax[0].set_title('moving')
         ax[1].imshow(warp_moving.data)
@@ -196,11 +283,11 @@ def second_derivative_ii(vf, i, loss, epsilon, reg, deformation):
 
     res = -loss_forward2 + 16 * loss_forward - 30 * loss + 16 * loss_backward - loss_backward2
 
-    # print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
-    #                                                                                          loss_forward, loss,
-    #                                                                                          loss_backward,
-    #                                                                                          loss_backward2,
-    #                                                                                          res))
+    print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
+                                                                                             loss_forward, loss,
+                                                                                             loss_backward,
+                                                                                             loss_backward2,
+                                                                                             res))
     gc.collect()
     return res / float(12 * epsilon ** 2)
 
@@ -351,7 +438,7 @@ def second_derivative_ij(vf, i, j, loss, epsilon, reg, deformation):
     del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_b2_f2, loss_b2_b2, loss_f2_b2, loss_f2_f2
 
     res = 64 * a + 8 * b - 8 * c - d
-    # print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
+    print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
     gc.collect()
     return res / float(144 * epsilon ** 2)
 

@@ -103,7 +103,7 @@ def one_to_one(data1, data2, **kwargs):
     if kwargs['pipe_template']:
 
         gc.collect()
-        return warp, reg, template_pipeline_derivatives(reg=copy.deepcopy(reg),regularizer=regularizer,
+        return  template_pipeline_derivatives(reg=copy.deepcopy(reg),regularizer=regularizer,
                                                                 data=data1, template=data2, a=a, b=b,
                                                                 epsilon=kwargs['epsilon'],
                                                                 shape=data1.shape, inverse=kwargs['inverse'],

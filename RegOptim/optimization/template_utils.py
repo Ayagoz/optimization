@@ -1,5 +1,6 @@
 import gc
 import itertools
+import copy
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -8,7 +9,8 @@ from scipy.sparse import coo_matrix
 
 import rtk
 from RegOptim.utils import import_func
-from rtk.registration.LDDMM import derivative
+from rtk import Deformation
+import matplotlib.pyplot as plt
 
 joblib_path = '~/JOBLIB_TMP_FOLDER/'
 
@@ -120,24 +122,6 @@ def neighbours_indices(shape, I, mode='vec', window=3):
         raise TypeError('Not correct mode, support just `vec` and `mat`')
 
 
-def full_derivative_by_v(moving, template, backward_dets, n_steps, vf, similarity, regularizer, inverse):
-    deformation = deformation_grad(vf, n_steps, template.shape)
-
-    moving_imgs, template_img = deformation_applied(moving, template, n_steps, deformation, inverse)
-
-    if inverse:
-        T = -1
-    else:
-        T = 0
-
-    grad_v = np.array([derivative(similarity=similarity, fixed=template_img[-T - 1],
-                                  moving=moving_imgs[T], Dphi=backward_dets[- T - 1],
-                                  vector_field=vf[T], regularizer=regularizer, learning_rate=1.)
-                       ])
-
-    return grad_v, deformation.backward_dets[-T - 1], moving_imgs[T]
-
-
 def intergal_of_action(vf, regularizer, n_steps):
     K = np.array([path_length(regularizer, vf[i]) for i in range(n_steps + 1)])
     return (K[0] / 2. + np.sum(K[1:-1]) + K[-1] / 2.) / float(n_steps)
@@ -153,222 +137,242 @@ def deformation_grad(vf, n_steps, shape):
     return deformation
 
 
-def deformation_applied(moving, template, n_steps, deformation, inverse):
-    if inverse:
-        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps + 1)
-        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=moving), n_steps + 1)
-    else:
-        template_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=moving), n_steps + 1)
-        moving_imgs = rtk.SequentialScalarImages(rtk.ScalarImage(data=template), n_steps + 1)
+def loss_func(reg, deformation, vf=None, show=False):
+    if vf is not None:
+        deformation = deformation_grad(vf=vf, n_steps=reg.n_steps, shape=reg.moving.shape)
 
-    moving_imgs.apply_transforms(deformation.forward_mappings)
-    # template_imgs.apply_transforms(deformation.backward_mappings)
-    return moving_imgs, template_imgs
+    moving = copy.deepcopy(reg.moving)
+    warp_moving = np.copy(moving.apply_transform(Deformation(grid=deformation.forward_mappings[-1]), order=3).data)
 
+    if show:
+        f, ax = plt.subplots(2,figsize=(10,10))
+        ax[0].imshow(moving)
+        ax[0].set_title('moving')
+        ax[1].imshow(warp_moving.data)
+        ax[1].set_title('in loss warped moving')
+        plt.axis('off')
+        plt.show()
 
-def loss_func(vf, moving, template, sigma, regularizer, n_steps, shape, inverse):
-    deformation = deformation_grad(vf=vf, n_steps=n_steps, shape=shape)
-    deformed_moving, deformed_fixed = deformation_applied(moving, template, n_steps, deformation, inverse)
-
-    # TODO: rewrite to optimize computing integral of action, can be stored(can count just the last one time step)
-    loss = np.sum(np.square(deformed_moving[-1] - deformed_fixed[0])) / float(
-        sigma)  # + intergal_of_action(vf, regularizer, n_steps)
-
+    loss = np.sum(np.square(warp_moving - reg.fixed.data)) / float(reg.similarity.variance)
+    # + intergal_of_action(vf, regularizer, n_steps)
+    gc.collect()
     return loss
 
 
-def second_derivative_ii(vf, i, loss, epsilon, moving, template, sigma, regularizer, n_steps, inverse):
-    copy_vf = vf.copy()
-    copy_vf[i] += epsilon
-    loss_forward = loss_func(vf=copy_vf, moving=moving, template=template,
-                             sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                             inverse=inverse)
-    copy_vf = vf.copy()
-    copy_vf[i] -= epsilon
-    loss_backward = loss_func(vf=copy_vf, moving=moving, template=template,
-                              sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                              inverse=inverse)
-    copy_vf = vf.copy()
-    copy_vf[i] += 2 * epsilon
-    loss_forward2 = loss_func(vf=copy_vf, moving=moving, template=template,
-                              sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                              inverse=inverse)
+def second_derivative_ii(vf, i, loss, epsilon, reg, deformation):
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
 
-    copy_vf = vf.copy()
-    copy_vf[i] -= 2 * epsilon
-    loss_backward2 = loss_func(vf=copy_vf, moving=moving, template=template,
-                               sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                               inverse=inverse)
+    vf1[i] += epsilon
+    vf2[i] -= epsilon
+    vf3[i] += 2 * epsilon
+    vf4[i] -= 2 * epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    # print(np.allclose(def1.backward_dets, def2.backward_dets))
+    # print(np.allclose(def1.backward_mappings, def2.backward_mappings))
+    # print(np.allclose(def1.forward_dets, def2.forward_dets))
+    # print(np.allclose(def1.forward_mappings, def2.forward_mappings))
+    # print(np.abs(def1.backward_dets - def2.backward_dets).sum())
+    # print(np.abs(def1.backward_mappings - def2.backward_mappings).sum())
+    # print(np.abs(def1.forward_dets - def2.forward_dets).sum())
+    # print(np.abs(def1.forward_mappings - def2.forward_mappings).sum())
+
+    loss_forward = loss_func(reg=copy.deepcopy(reg), deformation=def1)
+    loss_backward = loss_func(reg=copy.deepcopy(reg), deformation=def2)
+    loss_forward2 = loss_func(reg=copy.deepcopy(reg), deformation=def3)
+    loss_backward2 = loss_func(reg=copy.deepcopy(reg), deformation=def4)
 
     res = -loss_forward2 + 16 * loss_forward - 30 * loss + 16 * loss_backward - loss_backward2
-    print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
-                                                                                             loss_forward, loss,
-                                                                                             loss_backward,
-                                                                                             loss_backward2,
-                                                                                             res))
 
+    # print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
+    #                                                                                          loss_forward, loss,
+    #                                                                                          loss_backward,
+    #                                                                                          loss_backward2,
+    #                                                                                          res))
+    gc.collect()
     return res / float(12 * epsilon ** 2)
 
 
-def second_derivative_ij(vf, i, j, epsilon, moving, template,  sigma, regularizer, n_steps, inverse):
+def second_derivative_ij(vf, i, j, loss, epsilon, reg, deformation):
     # d^2f/dx/dy ~ (f(x-e, y -e) + f(x+e, y+e) - f(x+e, y-e) - f(x-e, y+e))/ (4*e^2) with precision O(h^2)
     # f(x+1, y + 1)
-    vf_copy = vf.copy()
-    vf_copy[i] += epsilon
-    vf_copy[j] += epsilon
-    loss_f11 = loss_func(vf=vf_copy, moving=moving, template=template,
-                         sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                         inverse=inverse)
-    # f(x+ 1, y -1)
-    vf_copy = vf.copy()
-    vf_copy[i] += epsilon
-    vf_copy[j] -= epsilon
-    loss_f1_b1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
+    # f(x+1, y+1)
+    vf1[i] += epsilon
+    vf1[j] += epsilon
+    # f(x+1, y - 1)
+    vf2[i] += epsilon
+    vf2[j] -= epsilon
     # f(x-1, y + 1)
-    vf_copy = vf.copy()
-    vf_copy[i] -= epsilon
-    vf_copy[j] += epsilon
-    loss_b1_f1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf3[i] -= epsilon
+    vf3[j] += epsilon
     # f(x-1, y -1)
-    vf_copy = vf.copy()
-    vf_copy[i] -= epsilon
-    vf_copy[j] -= epsilon
-    loss_b11 = loss_func(vf=vf_copy, moving=moving, template=template,
-                         sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                         inverse=inverse)
+    vf4[i] -= epsilon
+    vf4[j] -= epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    loss_f11 = loss_func(reg=copy.deepcopy(reg), deformation=def1)
+    loss_f1_b1 = loss_func(reg=copy.deepcopy(reg), deformation=def2)
+    loss_b1_f1 = loss_func(reg=copy.deepcopy(reg), deformation=def3)
+    loss_b11 = loss_func(reg=copy.deepcopy(reg), deformation=def4)
 
     a = (loss_b11 + loss_f11 - loss_f1_b1 - loss_b1_f1)
+    del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_f11, loss_f1_b1, loss_b1_f1, loss_b11
 
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
     # f(x+1, y-2)
-    vf_copy = vf.copy()
-    vf_copy[i] += epsilon
-    vf_copy[j] -= 2 * epsilon
-    loss_f1_b2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-
-    # f(x+2, y-1)
-    vf_copy = vf.copy()
-    vf_copy[i] += 2 * epsilon
-    vf_copy[j] -= epsilon
-    loss_f2_b1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf1[i] += epsilon
+    vf1[j] -= 2 * epsilon
+    # f(x+2, y -1)
+    vf2[i] += 2 * epsilon
+    vf2[j] -= epsilon
     # f(x-2, y+1)
-    vf_copy = vf.copy()
-    vf_copy[i] -= 2 * epsilon
-    vf_copy[j] += epsilon
-    loss_b2_f1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-    # f(x-1, y + 2)
-    vf_copy = vf.copy()
-    vf_copy[i] -= epsilon
-    vf_copy[j] += 2 * epsilon
-    loss_b1_f2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf3[i] -= 2 * epsilon
+    vf3[j] += epsilon
+    # f(x-1, y+2)
+    vf4[i] -= epsilon
+    vf4[j] += 2 * epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    loss_f1_b2 = loss_func(reg=copy.deepcopy(reg), deformation=def1)
+    loss_f2_b1 = loss_func(reg=copy.deepcopy(reg), deformation=def2)
+    loss_b2_f1 = loss_func(reg=copy.deepcopy(reg), deformation=def3)
+    loss_b1_f2 = loss_func(reg=copy.deepcopy(reg), deformation=def4)
 
     b = (loss_f1_b2 + loss_f2_b1 + loss_b2_f1 + loss_b1_f2)
+    del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_f1_b2, loss_f2_b1, loss_b2_f1, loss_b1_f2
+
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
 
     # f(x-1, y-2)
-    vf_copy = vf.copy()
-    vf_copy[i] -= epsilon
-    vf_copy[j] -= 2 * epsilon
-    loss_b1_b2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-
+    vf1[i] -= epsilon
+    vf1[j] -= 2 * epsilon
     # f(x-2, y-1)
-    vf_copy = vf.copy()
-    vf_copy[i] -= 2 * epsilon
-    vf_copy[j] -= epsilon
-    loss_b2_b1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf2[i] -= 2 * epsilon
+    vf2[j] -= epsilon
     # f(x+1, y+2)
-    vf_copy = vf.copy()
-    vf_copy[i] += epsilon
-    vf_copy[j] += 2 * epsilon
-    loss_f1_f2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-    # f(x+2, y + 1)
-    vf_copy = vf.copy()
-    vf_copy[i] += 2 * epsilon
-    vf_copy[j] += epsilon
-    loss_f2_f1 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf3[i] += epsilon
+    vf3[j] += 2 * epsilon
+    # f(x+2, y+1)
+    vf4[i] += 2 * epsilon
+    vf4[j] += epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    loss_b1_b2 = loss_func(reg=copy.deepcopy(reg), deformation=def1)
+    loss_b2_b1 = loss_func(reg=copy.deepcopy(reg), deformation=def2)
+    loss_f1_f2 = loss_func(reg=copy.deepcopy(reg), deformation=def3)
+    loss_f2_f1 = loss_func(reg=copy.deepcopy(reg), deformation=def4)
 
     c = loss_b1_b2 + loss_b2_b1 + loss_f1_f2 + loss_f2_f1
+    del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_b2_b1, loss_b1_b2, loss_f2_f1, loss_f1_f2
+
+    vf1 = np.copy(vf)
+    vf2 = np.copy(vf)
+    vf3 = np.copy(vf)
+    vf4 = np.copy(vf)
 
     # f(x+2, y-2)
-    vf_copy = vf.copy()
-    vf_copy[i] += 2 * epsilon
-    vf_copy[j] -= 2 * epsilon
-    loss_f2_b2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-
+    vf1[i] += 2 * epsilon
+    vf1[j] -= 2 * epsilon
     # f(x-2, y+2)
-    vf_copy = vf.copy()
-    vf_copy[i] -= 2 * epsilon
-    vf_copy[j] += 2 * epsilon
-    loss_b2_f2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf2[i] -= 2 * epsilon
+    vf2[j] += 2 * epsilon
     # f(x-2, y-2)
-    vf_copy = vf.copy()
-    vf_copy[i] -= 2 * epsilon
-    vf_copy[j] -= 2 * epsilon
-    loss_b2_b2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
-    # f(x+2, y + 2)
-    vf_copy = vf.copy()
-    vf_copy[i] += 2 * epsilon
-    vf_copy[j] += 2 * epsilon
-    loss_f2_f2 = loss_func(vf=vf_copy, moving=moving, template=template,
-                           sigma=sigma, regularizer=regularizer, n_steps=n_steps, shape=template.shape,
-                           inverse=inverse)
+    vf3[i] -= 2 * epsilon
+    vf3[j] -= 2 * epsilon
+    # f(x+2, y+2)
+    vf4[i] += 2 * epsilon
+    vf4[j] += 2 * epsilon
+
+    def1 = copy.deepcopy(deformation)
+    def2 = copy.deepcopy(deformation)
+    def3 = copy.deepcopy(deformation)
+    def4 = copy.deepcopy(deformation)
+
+    def1.update_mappings(0.5 * (vf1[1:] + vf1[:-1]))
+    def2.update_mappings(0.5 * (vf2[1:] + vf2[:-1]))
+    def3.update_mappings(0.5 * (vf3[1:] + vf3[:-1]))
+    def4.update_mappings(0.5 * (vf4[1:] + vf4[:-1]))
+
+    loss_f2_b2 = loss_func(reg=copy.deepcopy(reg), deformation=def1)
+    loss_b2_f2 = loss_func(reg=copy.deepcopy(reg), deformation=def2)
+    loss_b2_b2 = loss_func(reg=copy.deepcopy(reg), deformation=def3)
+    loss_f2_f2 = loss_func(reg=copy.deepcopy(reg), deformation=def4)
 
     d = loss_f2_b2 + loss_b2_f2 - loss_b2_b2 - loss_f2_f2
+    del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_b2_f2, loss_b2_b2, loss_f2_b2, loss_f2_f2
 
     res = 64 * a + 8 * b - 8 * c - d
-    print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
-
+    # print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
+    gc.collect()
     return res / float(144 * epsilon ** 2)
 
 
-def second_derivative_by_loss(vf, i, j, loss, epsilon, moving, template,  similarity, regularizer, n_steps,
-                              inverse):
+def second_derivative_by_loss(vf, i, j, loss, epsilon, reg, deformation):
     assert len(vf.shape) == len(i) == len(j), "Not correct indices"
 
     if i == j:
-        return second_derivative_ii(vf=vf, i=i, loss=loss, epsilon=epsilon, moving=moving, template=template,
-                                    sigma=similarity.variance, regularizer=regularizer,
-                                    n_steps=n_steps, inverse=inverse)
+        return second_derivative_ii(vf=np.copy(vf), i=i, loss=loss, epsilon=epsilon, reg=copy.deepcopy(reg),
+                                    deformation=copy.deepcopy(deformation))
 
     elif i != j:
-        return second_derivative_ij(vf=vf, i=i, j=j, epsilon=epsilon, moving=moving, template=template,
-                                     sigma=similarity.variance, regularizer=regularizer,
-                                    n_steps=n_steps, inverse=inverse)
+        return second_derivative_ij(vf=np.copy(vf), i=i, j=j, loss=loss, epsilon=epsilon,
+                                    reg=copy.deepcopy(reg), deformation=copy.deepcopy(deformation))
     else:
         raise TypeError('you should give correct indices')
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, loss, window, params_grad, param_der):
+def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_grad, param_der):
     mat_len = int(np.prod(mat_shape))
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
-    if params_grad['inverse']:
-        T = -1
-    else:
-        T = 0
 
     derivative_func = import_func(**param_der)
 
@@ -386,9 +390,9 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, loss, window, params_gra
 
                 if not ((j < mn).any() or (j >= mx).any()) and i <= tuple(j):
                     der = derivative_func(
-                        i=(slice(None), ax,) + i,
-                        j=(slice(None), ax,) + tuple(j),
-                        vf=vector, loss=loss, **params_grad
+                        i=(T, ax,) + i,
+                        j=(T, ax,) + tuple(j),
+                        vf=np.copy(vector), loss=loss, **params_grad
                     )
 
                     i_loc = I + ax * mat_len

@@ -80,11 +80,11 @@ def one_to_one(data1, data2, **kwargs):
     if data1.shape != data2.shape:
         if data1.shape < data2.shape:
             pad_size = data2.shape[0] - data1.shape[0]
-            data1 = padding(data1, ndim = data1.ndim, pad_size=pad_size, mode='edge')
+            data1 = padding(data1, ndim=data1.ndim, pad_size=pad_size, mode='edge')
             kwargs['pad_size'] += pad_size
         elif data1.shape > data2.shape:
             pad_size = data1.shape[0] - data2.shape[0]
-            data1 = padding(data2, ndim = data2.ndim, pad_size=pad_size, mode='edge')
+            data1 = padding(data2, ndim=data2.ndim, pad_size=pad_size, mode='edge')
             kwargs['pad_size'] += pad_size
         else:
             raise TypeError(str(data1.shape) + '!=' + str(data2.shape), 'data shape != template shape')
@@ -95,19 +95,23 @@ def one_to_one(data1, data2, **kwargs):
     else:
         reg.set_images(rtk.ScalarImage(data=data1), rtk.ScalarImage(data=data2))
 
-    warp, deformation = reg.execute()
+    warp = reg.execute()
 
     # get resulting vector field in one resolution
     # if vf0=True, get (1, ndim, img_shape), else get (t, ndim, img_shape)
 
     if kwargs['pipe_template']:
+
         gc.collect()
-        return warp, deformation, template_pipeline_derivatives(reg=reg, similarity=similarity, regularizer=regularizer,
-                                             data=data1, template=data2, a=a, b=b, epsilon=kwargs['epsilon'],
-                                             shape=data1.shape, inverse=kwargs['inverse'],
-                                             params_der=kwargs['params_der'], optim_template=kwargs['optim_template'],
-                                             n_jobs=kwargs['n_jobs'], window=kwargs['window']
-                                             )
+        return warp, reg, template_pipeline_derivatives(reg=copy.deepcopy(reg),regularizer=regularizer,
+                                                                data=data1, template=data2, a=a, b=b,
+                                                                epsilon=kwargs['epsilon'],
+                                                                shape=data1.shape, inverse=kwargs['inverse'],
+                                                                params_der=kwargs['params_der'],
+                                                                optim_template=kwargs['optim_template'],
+                                                                window=kwargs['window'],
+
+                                                                )
 
     else:
         gc.collect()

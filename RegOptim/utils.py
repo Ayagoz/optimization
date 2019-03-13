@@ -7,6 +7,13 @@ import importlib
 
 from sklearn.model_selection import StratifiedShuffleSplit
 
+def show_grid(grid, shape, interval=1):
+    import matplotlib.pyplot as plt
+    for x in range(0, shape[0], interval):
+        plt.plot(grid[1, x, :], grid[0, x, :], 'k')
+    for y in range(0, shape[1], interval):
+        plt.plot(grid[1, :, y], grid[0, :, y], 'k')
+    plt.show()
 
 def save_params(path, name, params):
     json.dump(params, open(os.path.join(path, name + '.txt'), 'w'))

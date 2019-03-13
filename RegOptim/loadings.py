@@ -21,7 +21,7 @@ def load_data_from_one_dir(path_to_data, file_type, target_type):
             data += [load_nii(path_to_subj, file_type)]
         if file_type == 'path':
             data += [path_to_subj]
-
+    print('data shape {}, target shape {}'.format(data.shape, target.shape))
     return np.array(data), np.array(target)
 
 

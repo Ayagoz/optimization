@@ -284,11 +284,11 @@ def second_derivative_ii(vf, i, loss, epsilon, reg, deformation):
 
     res = -loss_forward2 + 16 * loss_forward - 30 * loss + 16 * loss_backward - loss_backward2
 
-    print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
-                                                                                             loss_forward, loss,
-                                                                                             loss_backward,
-                                                                                             loss_backward2,
-                                                                                             res))
+    # print('ii forward2 {}, forward {} \n loss {} backward {} backward2 {}, \n res {}'.format(loss_forward2,
+    #                                                                                          loss_forward, loss,
+    #                                                                                          loss_backward,
+    #                                                                                          loss_backward2,
+    #                                                                                          res))
     gc.collect()
     return res / float(12 * epsilon ** 2)
 
@@ -439,7 +439,7 @@ def second_derivative_ij(vf, i, j, loss, epsilon, reg, deformation):
     del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_b2_f2, loss_b2_b2, loss_f2_b2, loss_f2_f2
 
     res = 64 * a + 8 * b - 8 * c - d
-    print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
+    #print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
     gc.collect()
     return res / float(144 * epsilon ** 2)
 

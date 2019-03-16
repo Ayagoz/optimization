@@ -4,6 +4,7 @@ import copy
 
 import numpy as np
 from joblib import Parallel, delayed
+from scipy.sparse.linalg import inv
 from scipy.fftpack import fftn, ifftn
 from scipy.sparse import coo_matrix
 
@@ -484,13 +485,13 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_
 
                     i_loc = I + ax * mat_len
                     j_loc = matrix_to_vec_indices(j, mat_shape) + ax * mat_len
-
-                    data.extend([der, der])
-                    rows.extend([i_loc, j_loc])
-                    cols.extend([j_loc, i_loc])
+                    if np.abs(der) > 1e-8:
+                        data.extend([der, der])
+                        rows.extend([i_loc, j_loc])
+                        cols.extend([j_loc, i_loc])
 
     gc.collect()
-    return coo_matrix((data, (rows, cols)), shape=(ndim * mat_len, ndim * mat_len))
+    return inv(coo_matrix((data, (rows, cols)), shape=(ndim * mat_len, ndim * mat_len)))
 
 
 def double_dev_J_v(vec):

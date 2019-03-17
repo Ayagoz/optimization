@@ -439,7 +439,7 @@ def second_derivative_ij(vf, i, j, loss, epsilon, reg, deformation):
     del vf1, vf2, vf3, vf4, def1, def2, def3, def4, loss_b2_f2, loss_b2_b2, loss_f2_b2, loss_f2_f2
 
     res = 64 * a + 8 * b - 8 * c - d
-    #print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
+    # print('a {}, b{}, c{}, d{} \n res {}'.format(a, b, c, d, res))
     gc.collect()
     return res / float(144 * epsilon ** 2)
 
@@ -491,7 +491,11 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_
                     cols.extend([j_loc, i_loc])
 
     gc.collect()
-    return inv(coo_matrix((data, (rows, cols)), shape=(ndim * mat_len, ndim * mat_len)))
+    shape = (ndim * mat_len, ndim * mat_len)
+    r = np.arange(shape[0])
+
+    reg = coo_matrix((np.repeat(1e-14, shape[0]), (r, r)), shape = shape)
+    return inv(coo_matrix((data, (rows, cols)), shape=shape) + reg)
 
 
 def double_dev_J_v(vec):

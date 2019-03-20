@@ -79,7 +79,7 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
     y_out_train = y[idx_out_train]
 
-    while it > pipeline_params['Number_of_iterations']:
+    while it < pipeline_params['Number_of_iterations']:
 
         st = time.time()
 
@@ -172,7 +172,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
                                         "test_score", "test_loss", "one_loop_time", "pad_size"])
 
     while (abs(a_it[-1] - a_it[-2]) + abs(b_it[-1] - b_it[-2])) > 1e-10 or \
-            it > pipeline_params['Number_of_iterations']:
+            it < pipeline_params['Number_of_iterations']:
 
         st = time.time()
 

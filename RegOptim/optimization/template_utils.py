@@ -1,11 +1,16 @@
 import gc
 import itertools
 import copy
+import functools
 
 import numpy as np
+from tqdm import tqdm
 from joblib import Parallel, delayed
 from scipy.sparse.linalg import inv
-from scipy.fftpack import fftn, ifftn
+from pyfftw.interfaces.scipy_fftpack import fftn, ifftn
+
+fftn = functools.partial(fftn, threads=5)
+ifftn = functools.partial(ifftn, threads=5)
 from scipy.sparse import coo_matrix
 
 import rtk
@@ -206,7 +211,7 @@ def grad_of_derivative_ij(vf, i, j, epsilon, reg, deformation):
     grad_b2 = gradient(reg=copy.deepcopy(reg), deformation=def4)
     ind = i[1:]
     res = -grad_f2[ind] + 8 * grad_f1[ind] - 8 * grad_b1[ind] + grad_b2[ind]
-    print('ii in grad der ', res)
+    # print('ii in grad der ', res)
 
     return res / (12 * epsilon)
 
@@ -458,7 +463,29 @@ def second_derivative_by_loss(vf, i, j, loss, epsilon, reg, deformation):
         raise TypeError('you should give correct indices')
 
 
-def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_grad, param_der):
+def one_der(i, ax, T, mat_shape, mat_len, deltas, mn, mx, derivative_func, vector, loss, params_grad):
+    I = matrix_to_vec_indices(i, mat_shape)
+    data, rows, cols = [], [], []
+    for delta in deltas:
+        j = np.array(i) + delta
+        if not ((j < mn).any() or (j >= mx).any()) and i <= tuple(j):
+            der = derivative_func(
+                i=(T, ax,) + i,
+                j=(T, ax,) + tuple(j),
+                vf=np.copy(vector), loss=loss, **params_grad
+            )
+            # if np.abs(der) > 1e-15:
+            i_loc = I + ax * mat_len
+            j_loc = matrix_to_vec_indices(j, mat_shape) + ax * mat_len
+
+            data.extend([der, der])
+            rows.extend([i_loc, j_loc])
+            cols.extend([j_loc, i_loc])
+
+    return data, rows, cols
+
+
+def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_grad, param_der, n_jobs=10):
     mat_len = int(np.prod(mat_shape))
     # assert ndim * mat_len == len(vector), "not correct shape of vector"
 
@@ -470,32 +497,46 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_
     data, rows, cols = [], [], []
 
     for ax in range(ndim):
-        for i in np.ndindex(*vector.shape[2:]):
-            I = matrix_to_vec_indices(i, mat_shape)
+        result = Parallel(n_jobs=n_jobs, temp_folder='~/JOBLIB_TMP_FOLDER/')(
+            delayed(one_der)(
+                i, ax, T, mat_shape, mat_len, deltas,
+                mn, mx, derivative_func, vector, loss, params_grad
+            )
+            for i in tqdm(np.ndindex(*vector.shape[2:]), desc='dJ_der')
+        )
 
-            for delta in deltas:
-                j = np.array(i) + delta
-
-                if not ((j < mn).any() or (j >= mx).any()) and i <= tuple(j):
-                    der = derivative_func(
-                        i=(T, ax,) + i,
-                        j=(T, ax,) + tuple(j),
-                        vf=np.copy(vector), loss=loss, **params_grad
-                    )
-
-                    i_loc = I + ax * mat_len
-                    j_loc = matrix_to_vec_indices(j, mat_shape) + ax * mat_len
-                    # if np.abs(der) > 1e-8:
-                    data.extend([der, der])
-                    rows.extend([i_loc, j_loc])
-                    cols.extend([j_loc, i_loc])
+        loc_data, loc_rows, loc_cols = map(np.concatenate, zip(*result))
+        data.extend(loc_data)
+        rows.extend(loc_rows)
+        cols.extend(loc_cols)
 
     gc.collect()
-    shape = (ndim * mat_len, ndim * mat_len)
-    r = np.arange(shape[0])
+    for i in range(min(mat_shape)):
+        I = matrix_to_vec_indices(i, mat_shape)
+        for ax in itertools.combinations(range(ndim), 2):
+            der = derivative_func(
+                i=(T, ax[0],) + (i,) * ndim,
+                j=(T, ax[1],) + (i,) * ndim,
+                vf=np.copy(vector), loss=loss, **params_grad
+            )
+            # if np.abs(der) > 1e-15:
 
-    reg = coo_matrix((np.repeat(1e-14, shape[0]), (r, r)), shape = shape)
-    return inv(coo_matrix((data, (rows, cols)), shape=shape) + reg)
+            i_loc = I + ax[0] * mat_len
+            j_loc = I + ax[1] * mat_len
+
+            data.extend([der, der])
+            rows.extend([i_loc, j_loc])
+            cols.extend([j_loc, i_loc])
+
+    shape = (ndim * mat_len, ndim * mat_len)
+    result = coo_matrix((data, (rows, cols)), shape=shape)
+
+    regul = np.real(ifftn(params_grad['reg'].regularizer.operator))
+    r = np.arange(int(ndim*mat_len))
+
+    reg = coo_matrix((np.repeat(regul.reshape(-1),2), (r, r)), shape=shape)
+
+    return inv(result + reg)
 
 
 def double_dev_J_v(vec):

@@ -75,7 +75,7 @@ def pairwise_pipeline_derivatives(reg, inverse):
 
 def template_pipeline_derivatives(reg, regularizer, data, template, a, b,
                                   epsilon, shape, inverse, optim_template, params_der,
-                                  window, ):
+                                  window, n_jobs=10):
     if inverse:
         T = 0
     else:
@@ -102,7 +102,8 @@ def template_pipeline_derivatives(reg, regularizer, data, template, a, b,
     if optim_template:
         dv_dJ = get_derivative_template(reg=copy.deepcopy(reg),
                                         params_der=params_der,
-                                        epsilon=epsilon, window=window, T=T
+                                        epsilon=epsilon, window=window, T=T,
+                                        n_jobs=n_jobs
                                         )
         # gc.collect()
         return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db, dv_dJ
@@ -112,7 +113,7 @@ def template_pipeline_derivatives(reg, regularizer, data, template, a, b,
     return Lvf, in_one_res, dv_da, dv_db, dLv_da, dLv_db
 
 
-def get_derivative_template(reg, epsilon, params_der, window, T):
+def get_derivative_template(reg, epsilon, params_der, window, T, n_jobs):
     # get I composed with phi
     # print moving_imgs.data[-1].shape, template_img.shape
 
@@ -132,17 +133,15 @@ def get_derivative_template(reg, epsilon, params_der, window, T):
     params_grad = {'reg': copy.deepcopy(reg), 'epsilon': epsilon,
                    'deformation': copy.deepcopy(reg.old_deformation)
                    }
-    print('in dJ old def sum ', np.abs(params_grad['deformation'].backward_dets).sum())
-    print('in dJ last def sum', np.abs(reg.deformation.backward_dets).sum())
 
     loss = loss_func(reg=copy.deepcopy(reg), deformation=copy.deepcopy(reg.deformation))
 
     dv_dJ = sparse_dot_product_forward(vector=np.copy(reg.resulting_vector_fields[-1].vector_fields),
                                        ndim=len(reg.fixed.shape), loss=loss, T=T,
                                        mat_shape=reg.fixed.shape, window=window, params_grad=params_grad,
-                                       param_der=params_der).dot(dl_dJ_dv)
+                                       param_der=params_der, n_jobs=n_jobs)  # .dot(dl_dJ_dv)
     # del dl_dv, dl_dJ_dv
 
     # gc.collect()
 
-    return dv_dJ
+    return [dv_dJ, dl_dJ_dv]

@@ -145,7 +145,7 @@ def get_derivative_template(reg, epsilon, params_der, window, T, n_jobs):
     # gc.collect()
 
 
-    return dv_dJ
+    return [dv_dJ]
 
 
 

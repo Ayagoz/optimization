@@ -138,8 +138,6 @@ def count_dist_matrix_to_template(**kwargs):
         raise TypeError('exp path cannot be None')
 
     n = len(data)
-    print('len of data n ', n)
-    print('data ', data)
     # path_to_dJ = os.path.join(exp_path, 'derivative/')
     # path = [os.path.join(path_to_dJ, ntpath.basename(data[i]).split('.')[0] + '.npz') for i in range(n)]
 

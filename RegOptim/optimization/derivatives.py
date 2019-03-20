@@ -139,13 +139,13 @@ def get_derivative_template(reg, epsilon, params_der, window, T, n_jobs):
     dv_dJ = sparse_dot_product_forward(vector=np.copy(reg.resulting_vector_fields[-1].vector_fields),
                                        ndim=len(reg.fixed.shape), loss=loss, T=T,
                                        mat_shape=reg.fixed.shape, window=window, params_grad=params_grad,
-                                       param_der=params_der, n_jobs=n_jobs)  # .dot(dl_dJ_dv)
+                                       param_der=params_der, n_jobs=n_jobs).dot(dl_dJ_dv)
     # del dl_dv, dl_dJ_dv
 
     # gc.collect()
 
 
-    return [dv_dJ, dl_dJ_dv]
+    return dv_dJ
 
 
 

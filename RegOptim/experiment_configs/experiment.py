@@ -18,7 +18,7 @@ def metric_learning_to_template(PATH):
     pipeline_params = json.load(open(PATH, 'r'))
     # extract params to shorter usage
     pipeline_main_loop = import_func(**pipeline_params['pipeline_main_loop'])
-    print('func', pipeline_main_loop)
+
     random_state = pipeline_params['random_state']
     experiment_name = pipeline_params['experiment_name']
     experiment_path = os.path.join(pipeline_params['path_to_exp'], experiment_name)
@@ -70,8 +70,7 @@ def metric_learning_to_template(PATH):
         pad_size = pipeline_params['pipeline_optimization_params']['pad_size']
     else:
         pad_size = 0
-    print('PAD SIZE ', pad_size)
-    print('ADD PADDING ',pipeline_params['pipeline_optimization_params']['add_padding'] )
+
     pipeline_main_loop(data=data, template=template, y=y, idx_out_train=idx_out_train,
                        idx_out_test=idx_out_test, experiment_path=experiment_path,
                        path_to_template=path_to_template, template_name=template_name,

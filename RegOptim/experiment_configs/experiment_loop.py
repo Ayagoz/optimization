@@ -75,7 +75,8 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
 
 
     add_padding = reg['add_padding']
-
+    print('add_pad', add_padding)
+    print('pad size', pad_size)
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
     y_out_train = y[idx_out_train]
 

@@ -5,7 +5,6 @@ from __future__ import print_function
 from RegOptim.image_utils import check_for_padding
 from RegOptim.utils import get_subset
 from RegOptim.utils import save_params, import_func
-from RegOptim.experiment_configs.experiment_loop import pipeline_main_loop
 from RegOptim.optimization.pipeline_utils import create_exp_folders, create_template, \
     pad_template_data_after_loop
 

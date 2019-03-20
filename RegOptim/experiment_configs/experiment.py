@@ -38,7 +38,7 @@ def metric_learning_to_template(PATH):
 
     np.savez(os.path.join(experiment_path, 'target.npz'), y)
 
-    if pipeline_params['subset'] is not None:
+    if pipeline_params['subset'] != 1.:
         data, y = get_subset(data, y, pipeline_params['subset'], pipeline_params['random_state'])
 
     print("Data size: ", data.shape, " target mean: ", y.mean())

@@ -1,6 +1,4 @@
 from __future__ import print_function
-from __future__ import print_function
-from __future__ import print_function
 from RegOptim.utils import import_func
 from RegOptim.optimization.pipeline import count_dist_matrix_to_template
 from RegOptim.ml.ml_utils import find_pipeline_params, adam_step
@@ -57,8 +55,7 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
     a = pipeline_params['pipeline_optimization_params']['a']
     b = pipeline_params['pipeline_optimization_params']['b']
 
-    # start param for optimization
-    optim_template = pipeline_params['start_optim_template']
+
     # create a resulting data frame
     if pipeline_params['kernel']:
         results = pd.DataFrame(columns=["iter", "a", "b", "kernel gamma", "LR C ", "train_score",
@@ -75,8 +72,7 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
 
 
     add_padding = reg['add_padding']
-    print('add_pad', add_padding)
-    print('pad size', pad_size)
+
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
     y_out_train = y[idx_out_train]
 

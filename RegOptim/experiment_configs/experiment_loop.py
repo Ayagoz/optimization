@@ -75,7 +75,7 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
 
     kwargs = create_kwargs(pipeline_params, data, template, a, b, idx_out_train, True, add_padding, pad_size)
     y_out_train = y[idx_out_train]
-    print(f'before while pad size {pad_size}, add_padding {add_padding}')
+
     while it < pipeline_params['Number_of_iterations']:
 
         st = time.time()
@@ -123,13 +123,8 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
 
             kwargs['add_padding'] = True
             kwargs['pad_size'] += reg['pad_size']
-            add_padding = True
-            pad_size += reg['pad_size']
 
-        print(f'after check padding pad size {pad_size}, add_padding {add_padding}')
-        print(f'template shape {template.shape}')
-        if add_padding:
-            pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
+
 
         if pipeline_params['kernel']:
             results.loc[it - 1] = [it, a, b, best_params['kernel__gamma'],
@@ -138,6 +133,9 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
         else:
             results.loc[it - 1] = [it, a, b, best_params['ml__C'], train_score,
                                    train_loss, test_score, test_loss, time.time() - st, pad_size]
+
+
+        kwargs['template'] = template
 
         it += 1
 

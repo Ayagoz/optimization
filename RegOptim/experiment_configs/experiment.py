@@ -71,6 +71,8 @@ def metric_learning_to_template(PATH):
     else:
         pad_size = 0
 
+
+
     pipeline_main_loop(data=data, template=template, y=y, idx_out_train=idx_out_train,
                        idx_out_test=idx_out_test, experiment_path=experiment_path,
                        path_to_template=path_to_template, template_name=template_name,

@@ -36,11 +36,11 @@ def metric_learning_to_template(PATH):
     if isinstance(data[0],(str, np.unicode, np.str, np.string_, np.unicode_)):
         np.savez(os.path.join(experiment_path, 'data_path.npz'), np.array(data))
 
-    np.savez(os.path.join(experiment_path, 'target.npz'), y)
+
 
     if pipeline_params['subset'] != 1.:
         data, y = get_subset(data, y, pipeline_params['subset'], pipeline_params['random_state'])
-
+    np.savez(os.path.join(experiment_path, 'target.npz'), y)
     print("Data size: ", data.shape, " target mean: ", y.mean())
 
     # create splits for (train+val) and test

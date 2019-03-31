@@ -50,11 +50,10 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
     lr_params = pipeline_params['lr_change_params'][pipeline_params['lr_type']['func']]
     template_updates = pipeline_params['template_updates']
     reg = pipeline_params['pipeline_optimization_params']
-    lr =  template_updates['lr']
+    lr = template_updates['lr']
     it = 1
     a = pipeline_params['pipeline_optimization_params']['a']
     b = pipeline_params['pipeline_optimization_params']['b']
-
 
     # create a resulting data frame
     if pipeline_params['kernel']:
@@ -68,8 +67,6 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
     print('For params a {} and b {}'.format(a, b))
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_template = import_func(**pipeline_params['count_grads_template'])
-
-
 
     add_padding = reg['add_padding']
 
@@ -86,7 +83,7 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
 
         K_path = os.path.join(os.path.join(pipeline_params['path_to_exp'], pipeline_params['experiment_name']),
                               'kernel')
-
+        np.savez(os.path.join(K_path, 'dJ_' + str(it) + '.npz'), dJ)
         np.savez(os.path.join(K_path, 'kernel_' + str(it) + '.npz'), K)
 
         K_out_train = K[np.ix_(idx_out_train, idx_out_train)]
@@ -106,15 +103,17 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
             n_splits=pipeline_params['n_splits'], ndim=pipeline_params['ndim'],
             random_state=pipeline_params['random_state'], kernel=pipeline_params['kernel']
         )
-
-        delta = preprocess_delta_template(grads_dJ, axis=template_updates['template_axis'],
-                                          contour_color=template_updates['color'],
-                                          width=template_updates['width'],
-                                          ndim=pipeline_params['ndim'])
-
+        np.savez(os.path.join(experiment_path, f'grads_dJ/grad_dJ_{it}.npz'), grads_dJ)
+        # delta = preprocess_delta_template(grads_dJ, axis=template_updates['template_axis'],
+        #                                   contour_color=template_updates['color'],
+        #                                   width=template_updates['width'],
+        #                                   ndim=pipeline_params['ndim'])
+        # np.savez(os.path.join(experiment_path, f'grads_dJ/delta_dJ_{it}.npz'), delta)
+        # lr_loc = lr * int(np.max(template))/ np.max(grads_dJ) # normalize on 255,  0.1 * 255 /np.max()
+        lr_loc = template_updates['lr'] * np.max(template) / np.std(grads_dJ)
         template_name = template_name.split('_')[0] + '_' + str(it) + '.nii'
         template = update_template(template, path_to_template, template_name,
-                                   delta, lr)
+                                   grads_dJ, lr_loc)
 
         if check_for_padding(template):
             template = pad_template_data_after_loop(template.copy(),
@@ -124,8 +123,6 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
             kwargs['add_padding'] = True
             kwargs['pad_size'] += reg['pad_size']
 
-
-
         if pipeline_params['kernel']:
             results.loc[it - 1] = [it, a, b, best_params['kernel__gamma'],
                                    best_params['ml__C'], train_score, train_loss, test_score,
@@ -133,7 +130,6 @@ def pipeline_main_loop_template_only(data, template, y, idx_out_train, idx_out_t
         else:
             results.loc[it - 1] = [it, a, b, best_params['ml__C'], train_score,
                                    train_loss, test_score, test_loss, time.time() - st, pad_size]
-
 
         kwargs['template'] = template
 
@@ -182,8 +178,10 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 
             template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size = optimize_template_step(
                 data.copy(), template, y.copy(), a_it[-1], b_it[-1], idx_out_train, idx_out_test,
-                pipeline_params, template_name, path_to_template, pad_size, it
+                pipeline_params, template_name, path_to_template, pad_size, it,
+                pipeline_params['template_updates']['lr']
             )
+
             if add_padding:
                 pipeline_params['pipeline_optimization_params']['add_padding'] = add_padding
 
@@ -207,7 +205,7 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
         print("one loop time: ", time.time() - st)
 
         a_it += [a_it[-1] - lr * adam_grad_da]
-        b_it += [b_it[-1] - lr * adam_grad_db]
+        # b_it += [b_it[-1] - lr * adam_grad_db]
 
         it += 1
 
@@ -222,9 +220,12 @@ def pipeline_main_loop(data, template, y, idx_out_train, idx_out_test,
 
 def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
                            pipeline_params, template_name, path_to_template,
-                           pad_size, it):
+                           pad_size, it, lr):
     test_score_prediction = import_func(**pipeline_params['prediction_func'])
     count_grads_template = import_func(**pipeline_params['count_grads_template'])
+
+    experiment_name = pipeline_params['experiment_name']
+    experiment_path = os.path.join(pipeline_params['path_to_exp'], experiment_name)
 
     template_updates = pipeline_params['template_updates']
     reg = pipeline_params['pipeline_optimization_params']
@@ -236,6 +237,7 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
     K, da, db, dJ = count_dist_matrix_to_template(**kwargs)
 
     K_path = os.path.join(os.path.join(pipeline_params['path_to_exp'], pipeline_params['experiment_name']), 'kernel')
+    np.savez(os.path.join(K_path, 'dJ_' + str(it) + '.npz'), dJ)
     np.savez(os.path.join(K_path, 'kernel_' + str(it) + '.npz'), K)
 
     K_out_train = K[np.ix_(idx_out_train, idx_out_train)]
@@ -255,15 +257,18 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
         n_splits=pipeline_params['n_splits'], ndim=pipeline_params['ndim'],
         random_state=pipeline_params['random_state'], kernel=pipeline_params['kernel']
     )
+    np.savez(os.path.join(experiment_path, f'grads_dJ/grad_dJ_{it}.npz'), grads_dJ)
+    # delta = preprocess_delta_template(grads_dJ, axis=template_updates['template_axis'],
+    #                                   contour_color=template_updates['color'],
+    #                                   width=template_updates['width'],
+    #                                   ndim=pipeline_params['ndim'])
 
-    delta = preprocess_delta_template(grads_dJ, axis=template_updates['template_axis'],
-                                      contour_color=template_updates['color'],
-                                      width=template_updates['width'],
-                                      ndim=pipeline_params['ndim'])
+    # np.savez(os.path.join(experiment_path, f'grads_dJ/delta_dJ_{it}.npz'), delta)
 
+    lr_loc = template_updates['lr'] * np.max(template) / np.std(grads_dJ)  # lr * int(np.max(template))/ np.max(grads_dJ)
     template_name = template_name.split('_')[0] + '_' + str(it) + '.nii'
     template = update_template(template, path_to_template, template_name,
-                               delta, template_updates['lr'])
+                               grads_dJ, lr_loc)
 
     if check_for_padding(template):
         template = pad_template_data_after_loop(template.copy(),
@@ -274,7 +279,6 @@ def optimize_template_step(data, template, y, a, b, idx_out_train, idx_out_test,
         pad_size += reg['pad_size']
         kwargs['add_padding'] = True
         kwargs['pad_size'] += reg['pad_size']
-        
 
     gc.collect()
     return template, best_params, grads_da, grads_db, train_score, test_score, train_loss, test_loss, add_padding, pad_size

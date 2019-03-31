@@ -6,6 +6,7 @@ from tqdm import tqdm
 import rtk
 from RegOptim.ml.ml_utils import expand_dims
 from RegOptim.optimization.template_utils import path_length
+from RegOptim.optimization.derivatives import Lv
 
 
 
@@ -66,6 +67,7 @@ def count_da_db_to_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
         da[i, :] = np.sum(vf * dLv_da[i], axis=axis) + \
                    np.sum(dv_da[i] * Lvf, axis=axis) + \
                    np.sum(dv_da * Lvf[i], axis=axis)
+
         db[i, :] = np.sum(vf * dLv_db[i], axis=axis) + \
                    np.sum(dv_db[i] * Lvf, axis=axis) + \
                    np.sum(dv_db * Lvf[i], axis=axis)
@@ -73,7 +75,7 @@ def count_da_db_to_template(Lvf, vf, dv_da, dv_db, dLv_da, dLv_db, n):
     return da, db
 
 
-def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, shape):
+def count_dJ(Lvfs_i, vfs_j, dv_dJ_i, dv_dJ_j, ndim, shape, A):
     # we want to differentiate K(kernel) by J (template)
     # K_ij = <Lv_i, v_j>
     # dK/dJ = <Ldv_i/dJ, v_j> + <Lv_i, dv_j/dJ>
@@ -87,7 +89,7 @@ def count_dJ(Lvfs_i, Lvfs_j, dv_dJ_i, dv_dJ_j, ndim, shape):
     # with open(dv_dJ_j, 'rb') as f:
     #     dv_dJ_j = pickle.load(f).astype(np.float32)
     axis = tuple(np.arange(Lvfs_i.ndim))
-
+    Lvfs_j = Lv(A**2, vfs_j)
     # np.sum(b[0] * a[..., None, None], axis=(1,2,3,4))
     dK_dJ = np.sum(dv_dJ_i * expand_dims(Lvfs_j, ndim), axis=axis) + \
             + np.sum(expand_dims(Lvfs_i, ndim) * dv_dJ_j, axis=axis)

@@ -25,7 +25,7 @@ def derivatives_of_pipeline_without_template(result, n_total):
     return K, da, db
 
 
-def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape):
+def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape, A):
     n_train = len(train_idx)
     Lvfs, vfs, dv_da, dv_db, dL_da, dL_db, dv_dJ = map(np.concatenate, zip(*result))
 
@@ -35,7 +35,7 @@ def derivatives_of_pipeline_with_template(result, train_idx, n_total, img_shape)
 
     shape_res = (ndim,) + img_shape + img_shape
 
-    metric = np.array([count_dJ(Lvfs[idx1], Lvfs[idx2], dv_dJ[idx1].copy(), dv_dJ[idx2].copy(), ndim, shape=shape_res)
+    metric = np.array([count_dJ(Lvfs[idx1], vfs[idx2], dv_dJ[idx1].copy(), dv_dJ[idx2].copy(), ndim, shape=shape_res, A=A)
                        for i, idx1 in tqdm(enumerate(train_idx), desc='dJ_train')
                        for idx2 in train_idx[i:]])
     dJ = np.zeros((n_train, n_train) + img_shape)
@@ -153,8 +153,11 @@ def count_dist_matrix_to_template(**kwargs):
 
     if kwargs['optim_template']:
         gc.collect()
+        regul = rtk.BiharmonicRegularizer(convexity_penalty=kwargs['a'], norm_penalty=kwargs['b'])
+        regul.set_operator(shape=kwargs['shape'])
+        A = regul.A**2
         return derivatives_of_pipeline_with_template(result=result, train_idx=kwargs['train_idx'], n_total=n,
-                                                     img_shape=kwargs['shape']
+                                                     img_shape=kwargs['shape'], A = A
                                                      )
 
     else:

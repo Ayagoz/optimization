@@ -37,6 +37,9 @@ def create_exp_folders(exp_path, params=None):
 
     path_to_kernels = os.path.join(exp_path, 'kernel/')
     os.makedirs(path_to_kernels, exist_ok=True)
+    
+    path_to_kernels = os.path.join(exp_path, 'grads_dJ/')
+    os.makedirs(path_to_kernels, exist_ok=True)
 
 
 def create_template(path_to_data, train_idx, path_to_template, template_name,

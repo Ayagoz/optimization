@@ -534,10 +534,12 @@ def sparse_dot_product_forward(vector, ndim, mat_shape, T, loss, window, params_
     regul = np.real(ifftn(params_grad['reg'].regularizer.operator))
     r = np.arange(int(ndim*mat_len))
 
-    reg = coo_matrix((np.repeat(regul.reshape(-1),2), (r, r)), shape=shape)
-
-    return inv(result + reg)
-
+    reg = coo_matrix((np.repeat(regul.reshape(-1),ndim), (r, r)), shape=shape)
+    try:
+        return inv(result + reg)
+    except:
+        regul2 = coo_matrix((np.repeat(1e-8, len(r)), (r,r)), shape = shape)
+        return inv(result + reg + regul2)
 
 def double_dev_J_v(vec):
     shape = int(np.prod(vec.shape[1:]))
